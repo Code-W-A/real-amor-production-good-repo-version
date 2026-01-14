@@ -7,7 +7,12 @@ import { sidebarItems } from "@/data/dashBoardSidebar";
 import { handleLogout } from "@/utils/authUtils";
 import { Router } from "next/router";
 
-export default function Sidebar({ adminText, usersText, disconnectText }) {
+export default function Sidebar({
+  adminText,
+  usersText,
+  disconnectText,
+  promotionsText,
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -20,6 +25,16 @@ export default function Sidebar({ adminText, usersText, disconnectText }) {
         >
           <i className={`text-20 icon-discovery mr-15`}></i>
           {usersText}
+        </Link>
+      </div>
+
+      <div className={`sidebar__item`}>
+        <Link
+          href={"/admin-promotii"}
+          className="d-flex items-center text-17 lh-1 fw-500 "
+        >
+          <i className={`text-20 icon-coupon mr-15`}></i>
+          {promotionsText || "Promoții"}
         </Link>
       </div>
 

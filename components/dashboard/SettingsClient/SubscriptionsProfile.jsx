@@ -8,7 +8,7 @@ import AlertBox from "@/components/uiElements/AlertBox";
 import { DotLoader } from "react-spinners";
 
 export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
-  const { userData, setUserData } = useAuth();
+  const { userData, setUserData, currentUser } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [canceling, setCanceling] = useState(false); // Stare pentru spinner-ul de anulare
@@ -26,10 +26,13 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const cancelSubscription = async () => {
     setCanceling(true);
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch("/api/cancel-subscription", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ subscriptionId: subscription.id }),
       });
@@ -79,6 +82,10 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const closeConfirmDialog = () => setShowConfirmDialog(false); // Închide dialogul fără anulare
 
   useEffect(() => {
+    if (userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess) {
+      setLoading(false);
+      return;
+    }
     if (userData && userData?.subscriptionId) {
       fetchSubscriptionDetails(userData?.subscriptionId);
     } else {
@@ -88,8 +95,11 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
 
   const fetchSubscriptionDetails = async (subscriptionId) => {
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch(
-        `/api/get-subscription?subscription_id=${subscriptionId}`
+        `/api/get-subscription?subscription_id=${subscriptionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await response.json();
       const isCanceled = data.cancel_at_period_end; // Adevărat dacă e programat să se anuleze la finalul perioadei curente
@@ -141,10 +151,13 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const reactivateSubscription = async () => {
     try {
       setReactivating(true);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch("/api/reactivate-subscription", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ subscriptionId: subscription.id }),
       });
@@ -192,6 +205,8 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                 <DotLoader color="#c13365" size={30} />
               </div>
             ) : userData?.isActivated ? (
+              userData?.subscriptionStatus === "lifetime" ||
+              userData?.lifetimeAccess ||
               userData?.subscriptionActive ||
               userData?.subscriptionStatus === "canceledUntilEnd" ? (
                 <>
@@ -201,22 +216,34 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                   <ul>
                     <li>
                       <strong>{translatedTexts.subscriptionIdText}:</strong>{" "}
-                      {subscription?.id}
+                      {userData?.subscriptionStatus === "lifetime" ||
+                      userData?.lifetimeAccess
+                        ? userData?.lifetimeSessionId || "-"
+                        : subscription?.id}
                     </li>
                     <li>
                       <strong>{translatedTexts.planText}:</strong>{" "}
-                      {subscription?.productName}
+                      {userData?.subscriptionStatus === "lifetime" ||
+                      userData?.lifetimeAccess
+                        ? userData?.subName || "Abonnement à vie"
+                        : subscription?.productName}
                     </li>
                     <li>
                       <strong>{translatedTexts.expiryDateText}:</strong>{" "}
-                      {new Date(
+                      {userData?.subscriptionStatus === "lifetime" ||
+                      userData?.lifetimeAccess
+                        ? "-"
+                        : new Date(
                         subscription?.current_period_end * 1000
                       ).toLocaleDateString()}
                     </li>
 
                     <li>
                       <strong>{translatedTexts.subscriptionStatusText}:</strong>{" "}
-                      {userData?.subscriptionStatus === "active"
+                      {userData?.subscriptionStatus === "lifetime" ||
+                      userData?.lifetimeAccess
+                        ? "Activ (pe viață)"
+                        : userData?.subscriptionStatus === "active"
                         ? translatedTexts.activeStatusText
                         : userData?.subscriptionStatus === "canceledUntilEnd"
                         ? `${translatedTexts.subscriptionCanceledUntilText} ${
@@ -243,7 +270,8 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                         <p>{translatedTexts.reactivatingText}</p>
                         <DotLoader color="#c13365" size={30} />
                       </div>
-                    ) : userData.subscriptionStatus === "canceledUntilEnd" ? (
+                    ) : userData?.subscriptionStatus === "lifetime" ||
+                      userData?.lifetimeAccess ? null : userData.subscriptionStatus === "canceledUntilEnd" ? (
                       <button
                         type="button"
                         className="button -md -green-1 text-white"

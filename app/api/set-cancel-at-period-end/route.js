@@ -3,26 +3,30 @@ import { requireAuth } from "../_utils/requireAuth";
 import { getStripe } from "../_utils/stripeUtils";
 
 export async function POST(request) {
-  const body = await request.json();
-  const { subscriptionId } = body;
-
   try {
     const auth = await requireAuth(request);
     if (auth instanceof NextResponse) return auth;
 
-    const stripe = getStripe();
+    const body = await request.json();
+    const { subscriptionId } = body || {};
+    if (!subscriptionId || typeof subscriptionId !== "string") {
+      return NextResponse.json(
+        { error: "Missing subscriptionId" },
+        { status: 400 }
+      );
+    }
 
-    // Ownership check:
-    // - Preferred: Stripe subscription metadata.uid
-    // - Legacy fallback: Stripe customer email === Firebase token email
-    const sub = await stripe.subscriptions.retrieve(subscriptionId);
-    const subUid = sub?.metadata?.uid || null;
+    const stripe = getStripe();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+    // Ownership check: prefer metadata.uid; fallback to email match.
+    const subUid = subscription?.metadata?.uid || null;
     if (subUid) {
       if (subUid !== auth.uid) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     } else {
-      const customerId = sub?.customer;
+      const customerId = subscription?.customer;
       if (!customerId || !auth.email) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
@@ -36,14 +40,14 @@ export async function POST(request) {
       }
     }
 
-    // Anulează abonamentul la sfârșitul perioadei curente
-    const subscription = await stripe.subscriptions.update(subscriptionId, {
+    const updated = await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
 
-    return NextResponse.json({ success: true, subscription });
+    return NextResponse.json({ success: true, subscription: updated });
   } catch (err) {
-    console.error("Eroare la anularea abonamentului:", err);
+    console.error("Error setting cancel_at_period_end:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

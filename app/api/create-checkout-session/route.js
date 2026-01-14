@@ -1,22 +1,35 @@
 // app/api/create-checkout-session/route.js
-import Stripe from "stripe";
 import { NextResponse } from "next/server";
+import { requireAuth } from "../_utils/requireAuth";
+import { getSafeOrigin, getStripe } from "../_utils/stripeUtils";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY_TEST);
+// Reservation (one-time) amount is fixed server-side for safety.
+// Keep this in cents to match Stripe `unit_amount`.
+const RESERVATION_AMOUNT_CENTS = 15900;
 
 export async function POST(request) {
   const body = await request.json();
   const {
     costRezervare, // Convertim în bani (de exemplu, 10000 pentru 100 RON)
     nume,
-    email, // Aici poți adăuga un email dintr-o stare sau context al utilizatorului
     phone,
-    uid,
   } = body;
 
   try {
-    console.log("Body:", body);
-    console.log("Stripe Secret Key:", process.env.STRIPE_SECRET_KEY_TEST);
+    const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+
+    const amount = Number(costRezervare);
+    // Server-side strict validation: only allow the fixed reservation amount.
+    if (!Number.isFinite(amount) || amount !== RESERVATION_AMOUNT_CENTS) {
+      return NextResponse.json(
+        { error: "Invalid amount" },
+        { status: 400 }
+      );
+    }
+
+    const stripe = getStripe();
+    const origin = getSafeOrigin(request);
 
     // Creează sesiunea de checkout cu opțiunea de creare factură
     const session = await stripe.checkout.sessions.create({
@@ -29,17 +42,16 @@ export async function POST(request) {
             product_data: {
               name: `Rezervare pentru ${nume}`,
             },
-            unit_amount: costRezervare, // Prețul în bani (de exemplu: 10000 bani pentru 100 RON)
+            unit_amount: amount,
           },
           quantity: 1,
         },
       ],
-      customer_email: email,
+      customer_email: auth.email || undefined,
       metadata: {
         nume,
-        email,
         phone,
-        uid,
+        uid: auth.uid,
       },
       automatic_tax: {
         enabled: true,
@@ -47,10 +59,8 @@ export async function POST(request) {
       invoice_creation: {
         enabled: true,
       },
-      success_url: `${request.headers.get(
-        "origin"
-      )}/plata-finalizata?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${request.headers.get("origin")}/pricing`,
+      success_url: `${origin}/plata-finalizata?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/pricing`,
     });
 
     return NextResponse.json({ id: session.id });

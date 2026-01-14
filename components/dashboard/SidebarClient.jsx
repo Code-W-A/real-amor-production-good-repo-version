@@ -39,7 +39,7 @@ export default function SidebarClient({
   useEffect(() => {
     setLoading(true);
     const authenticated = authentication;
-    onAuthStateChanged(authenticated, (user) => {
+    const unsubscribe = onAuthStateChanged(authenticated, (user) => {
       if (user) {
         // User is signed in, see docs for a list of available properties
         // https://firebase.google.com/docs/reference/js/auth.user
@@ -55,6 +55,7 @@ export default function SidebarClient({
         // ...
       }
     });
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -66,17 +67,34 @@ export default function SidebarClient({
             pathname == elm.href ? "-is-active" : ""
           } `}
         >
-          <Link
-            key={i}
-            href={elm.href}
-            className="d-flex items-center text-17 lh-1 fw-500 "
-            onClick={() =>
-              elm.id === 8 ? handleLogout() : console.log("click")
-            }
-          >
-            <i className={`${elm.iconClass} mr-15`}></i>
-            {elm.text}
-          </Link>
+          {elm.id === 8 ? (
+            <a
+              href="/login"
+              className="d-flex items-center text-17 lh-1 fw-500 "
+              onClick={async (e) => {
+                // Prevent navigation to an undefined href (which becomes /fr/undefined)
+                e.preventDefault();
+                try {
+                  await handleLogout();
+                } finally {
+                  router.push("/login");
+                }
+              }}
+            >
+              <i className={`${elm.iconClass} mr-15`}></i>
+              {elm.text}
+            </a>
+          ) : (
+            <Link
+              key={i}
+              href={elm.href || "/"}
+              className="d-flex items-center text-17 lh-1 fw-500 "
+              onClick={() => console.log("click")}
+            >
+              <i className={`${elm.iconClass} mr-15`}></i>
+              {elm.text}
+            </Link>
+          )}
         </div>
       ))}
     </div>

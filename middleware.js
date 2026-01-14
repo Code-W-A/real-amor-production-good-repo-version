@@ -5,7 +5,7 @@ export function middleware(req) {
 
   // Excludem rutele care nu trebuie redirecționate, cum ar fi resursele statice și fișierele specifice
   if (
-    pathname.startsWith("/_next/static") || // Exclude resursele Next.js generate automat
+    pathname.startsWith("/_next") || // Exclude resursele Next.js generate automat (static, image, data etc.)
     pathname.startsWith("/favicon.ico") || // Exclude favicon
     pathname.includes(".") || // Exclude orice fișier ce conține o extensie (ex. .css, .js, .png)
     pathname.startsWith("/api") // Exclude orice API endpoint
@@ -22,6 +22,11 @@ export function middleware(req) {
   if (langParam) {
     // Eliminăm parametrul "lang" din query string
     url.searchParams.delete("lang");
+
+    // Dacă nu avem prefix de limbă, redirecționăm direct la /{lang}/... (un singur hop)
+    if (!pathname.match(/^\/(en|ro|fr|nl)(\/|$)/)) {
+      url.pathname = `/${langParam}${pathname}`.replace(/\/\//g, "/");
+    }
 
     // Setăm cookie-ul pentru limba selectată
     const response = NextResponse.redirect(url);

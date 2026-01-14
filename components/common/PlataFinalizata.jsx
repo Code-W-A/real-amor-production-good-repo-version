@@ -1,22 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
-  collection,
+  arrayUnion,
   doc,
-  getDocs,
-  query,
+  getDoc,
+  serverTimestamp,
   setDoc,
-  where,
 } from "firebase/firestore";
-import { db, authentication } from "@/firebase"; // Asigură-te că ai importat `authentication`
-import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth"; // Importă metodele pentru reautentificare
+import { db } from "@/firebase";
 import { DotLoader } from "react-spinners";
-import { useRouter } from "next/navigation";
 
 export default function PaymentSuccessPage({
   paymentTitle,
@@ -32,56 +29,104 @@ export default function PaymentSuccessPage({
   amountPaidText,
 }) {
   const [loading, setLoading] = useState(true);
-  const [takingInfo, setTakingInfo] = useState(false);
   const [reservationData, setReservationData] = useState(null);
   const [isUpdated, setIsUpdated] = useState(false);
   const searchParams = useSearchParams();
   const session_id = searchParams?.get("session_id");
-  const router = useRouter();
   const {
     currentUser,
     loading: loadingContext,
-    userData,
     setUserData,
-    setCurrentUser,
   } = useAuth();
 
-  const fetchSessionData = async () => {
-    setLoading(true);
-    try {
-      if (!session_id) {
-        console.error("Lipsește session_id din URL.");
-        setLoading(false);
-        return;
-      }
+  const pollTimeoutRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const attemptsRef = useRef(0);
 
-      const response = await fetch(`/api/get-session?session_id=${session_id}`);
-      const sessionData = await response.json();
+  const MAX_POLL_ATTEMPTS = 6;
 
-      // if (sessionData && sessionData.payment_status === "paid") {
-      //ADAUGAT VERIFICARE USERDATA PENTRU A VEDEA DACA REZOLVA PROBLEMA CU PERSISTENTA INFO UTILIZATORI
-      if (sessionData && sessionData.payment_status === "paid" && userData) {
-        setReservationData(sessionData);
-        await updateReservationStatus(sessionData);
-      } else {
-        console.error("Plata nu a fost finalizată.");
-      }
-    } catch (error) {
-      console.error("Eroare la preluarea datelor sesiunii:", error);
-    } finally {
-      setLoading(false);
-      // router.push("/login");
+  const clearPoll = () => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
   };
 
-  const updateReservationStatus = async (sessionData) => {
+  const fetchSessionDataAndUpdate = async () => {
     try {
-      // adaugat pentru a verifica daca rezolva eroarea cu informatiile utilizatorului
-      if (!userData || !userData.uid) {
-        console.log("User data or UID missing.");
+      if (!session_id) {
+        console.error("Lipsește session_id din URL.");
         return;
       }
-      const userRef = doc(db, "Users", sessionData.metadata.uid);
+
+      const currentUid = currentUser?.uid || null;
+      if (!currentUid) {
+        console.error("Not authenticated");
+        return;
+      }
+
+      const token = await currentUser?.getIdToken?.();
+      if (!token) {
+        console.error("Not authenticated");
+        return;
+      }
+
+      // Avoid overlapping calls (React strict-mode / re-renders)
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
+      const response = await fetch(`/api/get-session?session_id=${session_id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sessionData = await response.json();
+      setReservationData(sessionData || null);
+
+      // If Stripe hasn't marked it paid yet, poll a few times
+      if (!sessionData || sessionData.payment_status !== "paid") {
+        attemptsRef.current += 1;
+        if (attemptsRef.current <= MAX_POLL_ATTEMPTS) {
+          const delayMs = Math.min(15000, 1000 * 2 ** (attemptsRef.current - 1));
+          clearPoll();
+          pollTimeoutRef.current = setTimeout(() => {
+            fetchSessionDataAndUpdate();
+          }, delayMs);
+        }
+        return;
+      }
+
+      // Safety: ensure the session belongs to the logged-in user
+      const sessionUid = sessionData?.metadata?.uid || null;
+      if (!sessionUid || sessionUid !== currentUid) {
+        console.error("Forbidden: session does not belong to current user.");
+        return;
+      }
+
+      await updateReservationStatus(sessionData, currentUid);
+    } catch (error) {
+      console.error("Eroare la preluarea datelor sesiunii:", error);
+    } finally {
+      inFlightRef.current = false;
+    }
+  };
+
+  const updateReservationStatus = async (sessionData, currentUid) => {
+    try {
+      if (!sessionData?.id) return;
+      if (!currentUid) return;
+
+      const userRef = doc(db, "Users", currentUid);
+
+      // Idempotency: if this session was already processed, skip
+      const snap = await getDoc(userRef);
+      const processed =
+        snap.exists() && Array.isArray(snap.data()?.payments?.processedSessionIds)
+          ? snap.data().payments.processedSessionIds
+          : [];
+      if (processed.includes(sessionData.id)) {
+        setIsUpdated(true);
+        return;
+      }
+
       const rez = {
         hasReserved: false,
         status: "paid",
@@ -93,33 +138,45 @@ export default function PaymentSuccessPage({
         userRef,
         {
           reservation: rez,
+          payments: {
+            processedSessionIds: arrayUnion(sessionData.id),
+            lastProcessedSessionId: sessionData.id,
+            lastProcessedAt: serverTimestamp(),
+          },
         },
         { merge: true }
-      ).then(() => {
-        setUserData((prevUserData) => ({
-          ...prevUserData,
-          reservation: rez,
-        }));
-        setIsUpdated(true);
-      });
+      );
+
+      setUserData((prevUserData) => ({
+        ...(prevUserData || {}),
+        reservation: rez,
+      }));
+      setIsUpdated(true);
     } catch (error) {
       console.error("Eroare la actualizarea rezervării în Firestore:", error);
-
-      // Solicită reautentificare în caz de eroare de permisiune
-      if (error.code === "auth/requires-recent-login") {
-        alert("Pentru a continua, este necesară reautentificarea.");
-        await reauthenticateUser();
-      }
     }
   };
 
   useEffect(() => {
-    if (!isUpdated) {
-      fetchSessionData();
+    setLoading(true);
+    clearPoll();
+    attemptsRef.current = 0;
+
+    if (!session_id || !currentUser?.uid || isUpdated) {
+      setLoading(false);
+      return;
     }
-  }, [session_id, userData, isUpdated]);
-  //ADAUGAT PENTRU A VERIFICARE EROARE UTILIZATOR DATE PERSISTENTA
-  // }, [session_id, userData]);
+
+    fetchSessionDataAndUpdate().finally(() => {
+      // Stop spinner once we have either processed or have a session object to show
+      setLoading(false);
+    });
+
+    return () => {
+      clearPoll();
+    };
+    // Only re-run when the session or authenticated user changes
+  }, [session_id, currentUser?.uid, isUpdated]);
 
   if (loadingContext || loading) {
     return (

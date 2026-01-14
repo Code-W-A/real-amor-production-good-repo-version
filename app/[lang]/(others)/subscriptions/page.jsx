@@ -78,6 +78,19 @@ export default async function Page({ params }) {
     abonament12: await fetchTranslation("Abonnement 12 mois", targetLanguage),
     abonament6: await fetchTranslation("Abonnement 6 mois", targetLanguage),
     abonament3: await fetchTranslation("Abonnement 3 mois", targetLanguage),
+    abonament1anNoRenew: await fetchTranslation(
+      "Abonnement 12 mois (sans renouvellement)",
+      targetLanguage
+    ),
+    abonamentLifetime: await fetchTranslation("Abonnement à vie", targetLanguage),
+    lifetimeFloaterCta: await fetchTranslation(
+      "Vrei abonament pe viață?",
+      targetLanguage
+    ),
+    lifetimeSectionHint: await fetchTranslation(
+      "Accès illimité (paiement unique)",
+      targetLanguage
+    ),
     monthText: await fetchTranslation("month", targetLanguage),
     signUpText: await fetchTranslation("Sign up", targetLanguage),
     logInText: await fetchTranslation("Log in", targetLanguage),

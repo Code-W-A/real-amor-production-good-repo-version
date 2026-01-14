@@ -21,7 +21,11 @@ export default function DashboardOne() {
   const [isRedirecting, setIsRedirecting] = useState(true);
   const router = useRouter();
   useEffect(() => {
-    if (!loading && currentUser?.user?.uid !== "SJTAqVztndgxISJAtnGzaSKieV02") {
+    const adminUids = new Set([
+      "SJTAqVztndgxISJAtnGzaSKieV02",
+      "feSm5lY3F7aFrWNWneYw8qbPkiT2",
+    ]);
+    if (!loading && !adminUids.has(currentUser?.user?.uid)) {
       router.push("/login-admin");
     } else {
       router.push("/lista-utilizatori");

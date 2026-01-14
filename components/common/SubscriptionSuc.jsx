@@ -1,11 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation"; // Importăm pentru a prelua parametrii din URL
 import { useAuth } from "@/context/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import {
+  arrayUnion,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "@/firebase"; // Asigură-te că importul către Firebase este corect
 
 export default function SubscriptionSuc({
@@ -34,53 +39,122 @@ export default function SubscriptionSuc({
   const router = useRouter();
   const [isUpdated, setIsUpdated] = useState(false);
 
-  const fetchSessionData = async () => {
-    console.log("Fetching session data...");
-    setLoading(true);
+  const pollTimeoutRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const attemptsRef = useRef(0);
+
+  const MAX_POLL_ATTEMPTS = 6;
+
+  const clearPoll = () => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  };
+
+  const fetchSessionDataAndUpdate = async () => {
     try {
       if (!session_id) {
         console.error("Lipsește session_id din URL.");
-        setLoading(false);
         return;
       }
 
-      console.log(`Fetching session data for session_id: ${session_id}`);
-      const response = await fetch(`/api/get-session?session_id=${session_id}`);
+      const currentUid = currentUser?.uid || null;
+      if (!currentUid) {
+        console.error("Not authenticated");
+        return;
+      }
+
+      const token = await currentUser?.getIdToken?.();
+      if (!token) {
+        console.error("Not authenticated");
+        return;
+      }
+
+      // Avoid overlapping calls (React strict-mode / re-renders)
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
+      const response = await fetch(`/api/get-session?session_id=${session_id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const sessionData = await response.json();
-      console.log("Session data received:", sessionData);
+      setReservationData(sessionData || null);
 
       if (sessionData && sessionData.id) {
-        setReservationData(sessionData);
-        console.log("Session data set to state.");
+        // Do not update Firestore unless Stripe confirms payment
+        if (sessionData.payment_status !== "paid") {
+          attemptsRef.current += 1;
+          if (attemptsRef.current <= MAX_POLL_ATTEMPTS) {
+            const delayMs = Math.min(
+              15000,
+              1000 * 2 ** (attemptsRef.current - 1)
+            );
+            clearPoll();
+            pollTimeoutRef.current = setTimeout(() => {
+              fetchSessionDataAndUpdate();
+            }, delayMs);
+          }
+          return;
+        }
 
-        // Dacă sessionData conține un ID de abonament, îl preluăm separat
+        // Safety: ensure the session belongs to the logged-in user
+        const sessionUid = sessionData?.metadata?.uid || null;
+        if (!sessionUid || sessionUid !== currentUid) {
+          console.error("Forbidden: session does not belong to current user.");
+          return;
+        }
+
+        // If subscription mode, fetch subscription details (may lag behind)
+        let subscriptionDetails = null;
         if (sessionData.subscription) {
-          const subscriptionDetails = await fetchSubscriptionDetails(
+          subscriptionDetails = await fetchSubscriptionDetails(
             sessionData.subscription
           );
-          console.log("Subscription details received:", subscriptionDetails);
-
-          // Adăugăm detaliile abonamentului în starea componentului
-          setReservationData((prevState) => ({
-            ...prevState,
-            subscriptionDetails,
-          }));
         }
+        const enriched = subscriptionDetails
+          ? { ...sessionData, subscriptionDetails }
+          : sessionData;
+
+        // If we need subscriptionDetails but don't have it yet, retry a few times.
+        if (
+          enriched?.mode === "subscription" &&
+          enriched?.subscription &&
+          !enriched?.subscriptionDetails
+        ) {
+          attemptsRef.current += 1;
+          if (attemptsRef.current <= MAX_POLL_ATTEMPTS) {
+            const delayMs = Math.min(
+              15000,
+              1000 * 2 ** (attemptsRef.current - 1)
+            );
+            clearPoll();
+            pollTimeoutRef.current = setTimeout(() => {
+              fetchSessionDataAndUpdate();
+            }, delayMs);
+          }
+          return;
+        }
+
+        await updateSubscriptionInFirestore(enriched, currentUid);
       } else {
         console.error("Sesiunea nu a fost găsită în Stripe.");
       }
     } catch (error) {
       console.error("Eroare la preluarea datelor sesiunii:", error);
     } finally {
-      setLoading(false);
+      inFlightRef.current = false;
     }
   };
 
   // Funcție pentru a obține detaliile abonamentului din Stripe
   const fetchSubscriptionDetails = async (subscriptionId) => {
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch(
-        `/api/get-subscription?subscription_id=${subscriptionId}`
+        `/api/get-subscription?subscription_id=${subscriptionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const subscriptionData = await response.json();
       return subscriptionData;
@@ -89,17 +163,116 @@ export default function SubscriptionSuc({
     }
   };
 
-  // Function to update subscription data in Firestore
-  // Function to update subscription data in Firestore
-  const updateSubscriptionInFirestore = async (sessionData) => {
-    if (!userData || !userData.uid) {
-      console.log("User data or UID missing.");
-      return;
-    }
-
-    const userDocRef = doc(db, "Users", userData.uid);
+  const setCancelAtPeriodEnd = async (subscriptionId) => {
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+      const res = await fetch("/api/set-cancel-at-period-end", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ subscriptionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to set cancel_at_period_end");
+      }
+      return data?.subscription || null;
+    } catch (e) {
+      console.error("Failed to set cancel_at_period_end:", e);
+      return null;
+    }
+  };
+
+  // Function to update subscription data in Firestore
+  const updateSubscriptionInFirestore = async (sessionData, currentUid) => {
+    if (!sessionData?.id) return;
+    if (!currentUid) return;
+
+    const userDocRef = doc(db, "Users", currentUid);
+    try {
+      // Idempotency: if this session was already processed, skip
+      const snap = await getDoc(userDocRef);
+      const processed =
+        snap.exists() && Array.isArray(snap.data()?.payments?.processedSessionIds)
+          ? snap.data().payments.processedSessionIds
+          : [];
+      if (processed.includes(sessionData.id)) {
+        setIsUpdated(true);
+        return;
+      }
+
+      // Lifetime purchase (mode=payment) - no Stripe subscription id
+      if (
+        sessionData?.mode === "payment" &&
+        (sessionData?.metadata?.planType === "lifetime" ||
+          (sessionData?.metadata?.subName || "")
+            .toLowerCase()
+            .includes("vie"))
+      ) {
+        const now = new Date();
+        await setDoc(
+          userDocRef,
+          {
+          lifetimeAccess: true,
+          lifetimePurchasedAt: now,
+          lifetimeSessionId: sessionData.id,
+          lifetimeAmount: sessionData.amount_total
+            ? sessionData.amount_total / 100
+            : null,
+          subName: sessionData.metadata?.subName || "Abonnement à vie",
+          // Keep existing gating compatible with the app
+          subscriptionActive: true,
+          subscriptionStatus: "lifetime",
+          cancelAtPeriodEnd: false,
+          payments: {
+            processedSessionIds: arrayUnion(sessionData.id),
+            lastProcessedSessionId: sessionData.id,
+            lastProcessedAt: serverTimestamp(),
+          },
+        },
+          { merge: true }
+        );
+
+        setUserData((prevUserData) => ({
+          ...(prevUserData || {}),
+          lifetimeAccess: true,
+          lifetimePurchasedAt: now,
+          lifetimeSessionId: sessionData.id,
+          lifetimeAmount: sessionData.amount_total
+            ? sessionData.amount_total / 100
+            : null,
+          subName: sessionData.metadata?.subName || "Abonnement à vie",
+          subscriptionActive: true,
+          subscriptionStatus: "lifetime",
+          cancelAtPeriodEnd: false,
+        }));
+
+        setIsUpdated(true);
+        return;
+      }
+
+      // Subscription purchases need details
+      if (!sessionData?.subscription || !sessionData?.subscriptionDetails) {
+        return;
+      }
+
       const subscriptionId = sessionData.subscription;
+      const wantsNoRenew =
+        String(sessionData?.metadata?.cancelAtPeriodEndOnCreate || "").toLowerCase() ===
+        "true";
+
+      // If this plan should not renew, enforce cancel_at_period_end after checkout
+      // (Stripe Checkout does not support setting it at session create time).
+      if (wantsNoRenew && !sessionData.subscriptionDetails?.cancel_at_period_end) {
+        const updated = await setCancelAtPeriodEnd(subscriptionId);
+        if (updated) {
+          sessionData = { ...sessionData, subscriptionDetails: updated };
+        }
+      }
+
       const priceId = sessionData.subscriptionDetails?.plan?.id;
       const subscriptionEndDate = new Date(
         sessionData.subscriptionDetails?.current_period_end * 1000
@@ -108,42 +281,40 @@ export default function SubscriptionSuc({
       // Setăm subscriptionStartDate doar la prima actualizare
       const subscriptionStartDate = new Date();
 
-      console.log("Updating Firestore with subscription details...");
-
-      await updateDoc(userDocRef, {
+      await setDoc(
+        userDocRef,
+        {
         subscriptionActive:
           sessionData.subscriptionDetails?.status === "active",
         subscriptionId: subscriptionId,
         priceId: priceId,
-        subscriptionAmount: sessionData.amount_total / 100,
+        subscriptionAmount: sessionData.amount_total
+          ? sessionData.amount_total / 100
+          : null,
         subscriptionStartDate: subscriptionStartDate,
         subscriptionEndDate: subscriptionEndDate,
         subscriptionStatus: sessionData.subscriptionDetails?.status,
         cancelAtPeriodEnd:
           sessionData.subscriptionDetails?.cancel_at_period_end,
         subName: sessionData.metadata.subName,
-      });
-
-      console.log("Subscription details updated in Firestore:", {
-        subscriptionActive:
-          sessionData.subscriptionDetails?.status === "active",
-        subscriptionId,
-        priceId,
-        subscriptionAmount: sessionData.amount_total / 100,
-        subscriptionStartDate,
-        subscriptionEndDate,
-        subscriptionStatus: sessionData.subscriptionDetails?.status,
-        cancelAtPeriodEnd:
-          sessionData.subscriptionDetails?.cancel_at_period_end,
-      });
+        payments: {
+          processedSessionIds: arrayUnion(sessionData.id),
+          lastProcessedSessionId: sessionData.id,
+          lastProcessedAt: serverTimestamp(),
+        },
+      },
+        { merge: true }
+      );
 
       setUserData((prevUserData) => ({
-        ...prevUserData,
+        ...(prevUserData || {}),
         subscriptionActive:
           sessionData.subscriptionDetails?.status === "active",
         subscriptionId: subscriptionId,
         priceId: priceId,
-        subscriptionAmount: sessionData.amount_total / 100,
+        subscriptionAmount: sessionData.amount_total
+          ? sessionData.amount_total / 100
+          : null,
         subscriptionStartDate: subscriptionStartDate,
         subscriptionEndDate: subscriptionEndDate,
         subscriptionStatus: sessionData.subscriptionDetails?.status,
@@ -157,28 +328,23 @@ export default function SubscriptionSuc({
   };
 
   useEffect(() => {
-    if (reservationData && userData && !isUpdated) {
-      console.log("Ready to update Firestore with reservation data...");
-      updateSubscriptionInFirestore(reservationData);
-    } else {
-      console.log("Waiting for data or already updated...");
-    }
-  }, [reservationData, userData, isUpdated]);
+    setLoading(true);
+    clearPoll();
+    attemptsRef.current = 0;
 
-  useEffect(() => {
-    if (session_id) {
-      console.log("Session ID found:", session_id); // Log dacă este găsit session_id
-      fetchSessionData(); // Fetch and save session data when session_id is available
-    } else {
-      console.log("No session ID found in URL.");
+    if (!session_id || !currentUser?.uid || isUpdated) {
+      setLoading(false);
+      return;
     }
-  }, [session_id]);
 
-  useEffect(() => {
-    if (!loadingContext && !userData?.username) {
-      console.log("User data missing or still loading:", userData); // Log dacă nu există datele utilizatorului
-    }
-  }, [loadingContext]);
+    fetchSessionDataAndUpdate().finally(() => {
+      setLoading(false);
+    });
+
+    return () => {
+      clearPoll();
+    };
+  }, [session_id, currentUser?.uid, isUpdated]);
 
   return (
     <section className="layout-pt-lg pt-10 layout-pb-md">

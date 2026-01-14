@@ -14,7 +14,7 @@ import { handleLogout } from "@/utils/authUtils";
 import AlertBox from "@/components/uiElements/AlertBox";
 
 export default function CloseAccount({ activeTab, translatedTexts }) {
-  const { userData, setUserData } = useAuth(); // Obținem datele utilizatorului curent
+  const { userData, setUserData, currentUser } = useAuth(); // Obținem datele utilizatorului curent
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [subscription, setSubscription] = useState(null); // Stare pentru a stoca detaliile abonamentului
@@ -36,8 +36,11 @@ export default function CloseAccount({ activeTab, translatedTexts }) {
   // Funcție pentru obținerea detaliilor abonamentului din Stripe
   const fetchSubscriptionDetails = async (subscriptionId) => {
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch(
-        `/api/get-subscription?subscription_id=${subscriptionId}`
+        `/api/get-subscription?subscription_id=${subscriptionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await response.json();
       console.log("data....", data);
@@ -52,10 +55,13 @@ export default function CloseAccount({ activeTab, translatedTexts }) {
   // Funcție pentru anularea abonamentului
   const cancelSubscription = async () => {
     try {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch("/api/cancel-subscription", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ subscriptionId: subscription.id }),
       });

@@ -394,9 +394,26 @@ export const questionsSet1 = [
     options: ["Je n’ai pas d’enfants.", "1", "2", "3", "4", "5", "6+"],
     type: "single", // Se poate selecta o singură opțiune
     conditionalNext: {
-      "Je n’ai pas d’enfants.": 30, // Sare direct la întrebarea 30 dacă utilizatorul nu are copii
+      "Je n’ai pas d’enfants.": 26.1, // Pune și întrebarea despre venit, apoi sare la întrebarea 30
     },
     next: 27, // Dacă există copii, continuă cu detalii despre aceștia
+    consentAfter: false,
+  },
+  {
+    id: 26.1,
+    text: "Votre revenu mensuel net est de :",
+    options: [
+      "Moins de 2000€/mois",
+      "Entre 2000 et 3000€/mois",
+      "Entre 3000 et 4000€/mois",
+      "Entre 4000 et 5000€/mois",
+      "Plus de 5000€/mois",
+      "Je n’ai pas de revenus mais j’ai une rente stable",
+    ],
+    type: "single",
+    // Client request: NOT used for matching
+    matchRequired: false,
+    compatibility: false,
     consentAfter: false,
   },
   {

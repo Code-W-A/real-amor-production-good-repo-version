@@ -33,6 +33,15 @@ import IntroductionQuiz from "./SettingsClient/IntroductionQuiz";
 import EvitaRaspuns from "./EvitaRaspuns";
 import { translateTextQuiz } from "@/utils/translationUtils";
 
+const DEV_AUTOFILL =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DEV_QUIZ_AUTOFILL === "true";
+
+const NO_ANSWER_OPTION = "Je préfère ne pas répondre à la question";
+const PURPOSE_COQUINES =
+  "Je cherche des rencontres coquines en toute discrétion.";
+const PURPOSE_AMIS = "Je cherche à élargir mon cercle d’amis.";
+
 const getQuestionSetName = (currentQuestions) => {
   if (currentQuestions === firstQuestions) return "firstQuestions";
   if (currentQuestions === questionsSet1) return "questionsSet1";
@@ -40,6 +49,111 @@ const getQuestionSetName = (currentQuestions) => {
   if (currentQuestions === questionsSet3) return "questionsSet3";
   return "unknownSet";
 };
+
+function firstStringOption(options = []) {
+  if (!Array.isArray(options)) return null;
+  const strings = options.filter((o) => typeof o === "string");
+  // Avoid forcing paths that need extra input if possible
+  const preferred = strings.find((o) => o !== "autre" && o !== "custom");
+  return preferred || strings[0] || null;
+}
+
+function pickSingleAnswer(question) {
+  const options = question?.options || [];
+  if (Array.isArray(options) && options.includes(NO_ANSWER_OPTION)) {
+    return NO_ANSWER_OPTION;
+  }
+  // image-selection stores the selected image filename
+  if (question?.type === "image-selection") {
+    const first = Array.isArray(options) ? options[0] : null;
+    return typeof first?.image === "string" ? first.image : null;
+  }
+  return firstStringOption(options);
+}
+
+function pickMultipleAnswer(question) {
+  const options = question?.options || [];
+  if (Array.isArray(options) && options.includes(NO_ANSWER_OPTION)) {
+    return [NO_ANSWER_OPTION];
+  }
+  const first = firstStringOption(options);
+  return first ? [first] : [];
+}
+
+function parseDDMMYYYY(str) {
+  if (typeof str !== "string") return null;
+  const m = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) {
+    return null;
+  }
+  const d = new Date(year, month - 1, day);
+  // basic validation (Date will auto-correct invalid dates)
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return null;
+  }
+  return d;
+}
+
+function computeAgeFromDate(birthDate) {
+  if (!(birthDate instanceof Date)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return Number.isFinite(age) && age >= 0 && age <= 120 ? age : null;
+}
+
+function buildAutoAnswers(questionSet) {
+  const safeSet = Array.isArray(questionSet) ? questionSet : [];
+  return safeSet.map((q) => {
+    const type = q?.type;
+
+    let answer = null;
+    if (type === "multiple") {
+      answer = pickMultipleAnswer(q);
+    } else if (type === "single" || type === "image-selection") {
+      answer = pickSingleAnswer(q);
+    } else if (type === "input") {
+      // Special-case: postal API question (id: 9) expects "City, postalCode"
+      if (q?.id === 9 || q?.api) {
+        answer = "Bruxelles, 1000";
+      } else if (q?.validation?.type === "number") {
+        // Keep as a string to match typical text input handling
+        answer = "10";
+      } else if (
+        q?.validation?.type === "date" ||
+        String(q?.placeholder || "").includes("JJ/MM/AAAA")
+      ) {
+        // Date of birth input used to compute age in the normal flow
+        answer = "01/01/1990";
+      } else {
+        answer = "Test";
+      }
+    } else if (type === "date-picker") {
+      answer = new Date(1990, 0, 1);
+    } else if (type === "date-range-picker") {
+      answer = {
+        startDate: new Date(1990, 0, 1),
+        endDate: new Date(1990, 0, 2),
+      };
+    } else if (type === "range") {
+      const min = Number.isFinite(Number(q?.validation?.min)) ? Number(q.validation.min) : 0;
+      const max = Number.isFinite(Number(q?.validation?.max)) ? Number(q.validation.max) : 100;
+      answer = q?.singleValue ? min : { min, max };
+    } else {
+      // Fallback for unknown types: prefer no-answer if offered, else first option
+      answer = pickSingleAnswer(q);
+    }
+
+    return { ...q, answer };
+  });
+}
 
 export default function QuizClient({
   targetLanguage,
@@ -83,6 +197,7 @@ export default function QuizClient({
   const searchParams = useSearchParams(); // Utilizăm useSearchParams pentru a obține parametrii URL
   const isEditQuiz = searchParams?.get("editQuiz"); // Obținem session_id din URL
   const [showIntroduction, setShowIntroduction] = useState(true);
+  const [devAutofillLoading, setDevAutofillLoading] = useState(false);
 
   // useEffect(() => {
   //   if (targetLanguage === "nl") {
@@ -164,15 +279,14 @@ export default function QuizClient({
       console.log("no userData...", userData?.username);
       router.push("/signup");
     }
-    if (!loadingContext && userData?.responses) {
+    // If the user already paid the reservation, never send them back to pricing.
+    if (!loadingContext && userData?.reservation?.hasReserved) {
+      router.push("/profil-client");
+    } else if (!loadingContext && userData?.reservation?.status === "paid") {
+      router.push("/booking");
+    } else if (!loadingContext && userData?.responses) {
       router.push("/pricing");
     }
-    // if (!loadingContext && userData?.reservation?.hasReserved) {
-    //   router.push("/profil-client");
-    // }
-    // if (!loadingContext && userData?.reservation?.status !== "paid") {
-    //   router.push("/pricing");
-    // }
     setIsRedirecting(false);
   }, [loadingContext]);
 
@@ -229,6 +343,70 @@ export default function QuizClient({
       );
     } catch (error) {
       console.error("Eroare la salvarea răspunsurilor:", error);
+    }
+  };
+
+  const handleDevAutoComplete = async () => {
+    if (!DEV_AUTOFILL) return;
+    if (!userData?.uid) {
+      setAlertMessage("DEV: user not loaded/authenticated.");
+      setShowAlert(true);
+      return;
+    }
+
+    setDevAutofillLoading(true);
+    try {
+      const autoFirst = buildAutoAnswers(firstQuestions);
+      const purposeAnswer = autoFirst?.[0]?.answer;
+
+      let activeQuestionSetName = "questionsSet1";
+      if (purposeAnswer === PURPOSE_COQUINES) {
+        activeQuestionSetName = "questionsSet2";
+      } else if (purposeAnswer === PURPOSE_AMIS) {
+        activeQuestionSetName = "questionsSet3";
+      }
+
+      const activeSet =
+        activeQuestionSetName === "questionsSet1"
+          ? questionsSet1
+          : activeQuestionSetName === "questionsSet2"
+          ? questionsSet2
+          : questionsSet3;
+
+      const autoActive = buildAutoAnswers(activeSet);
+      const filteredAnswers = {
+        firstQuestions: autoFirst,
+        [activeQuestionSetName]: autoActive,
+      };
+
+      // Compute age from DOB answer when present (same behavior as normal quiz)
+      let age = null;
+      const dobQ = autoActive.find(
+        (q) =>
+          q?.validation?.type === "date" ||
+          String(q?.placeholder || "").includes("JJ/MM/AAAA")
+      );
+      if (typeof dobQ?.answer === "string") {
+        const birthDate = parseDDMMYYYY(dobQ.answer);
+        age = computeAgeFromDate(birthDate);
+      }
+
+      const userDocRef = doc(db, "Users", userData.uid);
+      const dataToSave = { responses: filteredAnswers };
+      if (age !== null) dataToSave.age = age;
+
+      await updateDoc(userDocRef, dataToSave);
+      setUserData((prev) => ({
+        ...(prev || {}),
+        ...dataToSave,
+      }));
+      setQuizFinished(true);
+    } catch (error) {
+      console.error("DEV auto-complete error:", error);
+      setAlertMessage("DEV: Auto-complete failed. Check console.");
+      setShowAlert(true);
+    } finally {
+      setDevAutofillLoading(false);
     }
   };
 
@@ -524,6 +702,21 @@ export default function QuizClient({
           setProgress(
             ((nextQuestionIndex + 1) / currentQuestions.length) * 100
           );
+          return;
+        }
+      }
+    }
+
+    // Special-case: după întrebarea "Votre revenu mensuel net..." (26.1),
+    // dacă utilizatorul a selectat la întrebarea 26 că nu are copii,
+    // păstrăm comportamentul existent de a sări peste întrebările despre copii.
+    if (currentQuestion.id === 26.1) {
+      const childrenAnswer = selectedOptions?.[26];
+      if (childrenAnswer === "Je n’ai pas d’enfants.") {
+        const nextQuestionIndex = currentQuestions.findIndex((q) => q.id === 30);
+        if (nextQuestionIndex !== -1) {
+          setCurrentQuestionIndex(nextQuestionIndex);
+          setProgress(((nextQuestionIndex + 1) / currentQuestions.length) * 100);
           return;
         }
       }
@@ -951,7 +1144,23 @@ export default function QuizClient({
 
   if (showIntroduction) {
     return (
-      <IntroductionQuiz onStart={startQuiz} translatedLinks={translatedLinks} />
+      <>
+        {DEV_AUTOFILL && (
+          <div style={{ padding: 16 }}>
+            <button
+              type="button"
+              onClick={handleDevAutoComplete}
+              className="button -sm -purple-1 text-white"
+              disabled={devAutofillLoading}
+            >
+              {devAutofillLoading
+                ? "DEV: Auto-completing..."
+                : "DEV: Auto-complete quiz"}
+            </button>
+          </div>
+        )}
+        <IntroductionQuiz onStart={startQuiz} translatedLinks={translatedLinks} />
+      </>
     );
   }
 
@@ -975,6 +1184,20 @@ export default function QuizClient({
                         {translatedLinks.chestionarText}
                       </h1>
                     </div>
+                    {DEV_AUTOFILL && (
+                      <div className="col-auto ml-auto">
+                        <button
+                          type="button"
+                          onClick={handleDevAutoComplete}
+                          className="button -sm -purple-1 text-white"
+                          disabled={devAutofillLoading}
+                        >
+                          {devAutofillLoading
+                            ? "DEV: Auto-completing..."
+                            : "DEV: Auto-complete"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="border-light overflow-hidden rounded-8">
                     <div className="py-40 px-40 bg-dark-5">

@@ -2,8 +2,21 @@ const { createServer } = require("http");
 const { parse } = require("url");
 const next = require("next");
 
+// Load environment variables from a .env file when running on hosting panels.
+// If ENV_PATH is set (e.g. via cPanel Node.js app), load from that path.
+try {
+  // eslint-disable-next-line global-require
+  require("dotenv").config(
+    process.env.ENV_PATH ? { path: process.env.ENV_PATH } : undefined
+  );
+} catch {
+  // dotenv is optional; ignore if not installed
+}
+
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
+// In production we should not force localhost.
+// cPanel/Node apps typically bind via PORT and proxy to the public domain.
+const hostname = dev ? "localhost" : "0.0.0.0";
 const port = process.env.PORT || 3000;
 
 const app = next({ dev, hostname, port });
@@ -29,6 +42,6 @@ app.prepare().then(() => {
     }
   }).listen(port, (err) => {
     if (err) throw err;
-    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> Ready on http://${hostname}:${port} (dev=${dev})`);
   });
 });

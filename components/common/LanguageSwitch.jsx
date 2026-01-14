@@ -11,21 +11,27 @@ const LanguageSwitch = ({ closePopup }) => {
   const { changeLanguage } = useAuth(); // Funcția pentru schimbarea limbii din context
   const dropdownRef = useRef(null);
 
+  // Supported languages in the UI (RO intentionally hidden)
+  const supportedLangs = ["fr", "nl"];
   const flagImages = {
     nl: "/assets/img/flags/netherlands.png",
     fr: "/assets/img/flags/france.png",
-    ro: "/assets/img/flags/romania.png",
   };
 
   useEffect(() => {
     // Obține limba salvată din cookie sau setează limba implicită la "fr"
     const savedLocale = Cookies.get("NEXT_LOCALE") || "fr";
-    changeLanguage(savedLocale); // Setăm limba curentă
+    const localeToUse = supportedLangs.includes(savedLocale) ? savedLocale : "fr";
+    if (localeToUse !== savedLocale) {
+      Cookies.set("NEXT_LOCALE", localeToUse, { expires: 365 });
+    }
+    changeLanguage(localeToUse); // Setăm limba curentă
   }, []);
 
   const toggleDropdown = () => setOpen(!open);
 
   const changeLang = (newLocale) => {
+    if (!supportedLangs.includes(newLocale)) return;
     // Salvăm limba în cookies
     Cookies.set("NEXT_LOCALE", newLocale, { expires: 365 }); // Limba e salvată pentru 1 an
     changeLanguage(newLocale); // Schimbăm limba în context
@@ -58,7 +64,9 @@ const LanguageSwitch = ({ closePopup }) => {
     <div className="language-switch" ref={dropdownRef}>
       <div className="language-switch-btn" onClick={toggleDropdown}>
         <img
-          src={flagImages[pathname.split("/")[1] || "fr"]} // Limba implicită e "fr"
+          src={
+            flagImages[supportedLangs.includes(pathname.split("/")[1]) ? pathname.split("/")[1] : "fr"]
+          } // Fallback la FR dacă suntem pe o limbă ascunsă/necunoscută
           alt="Language"
           width={30}
           height={30}
@@ -67,7 +75,7 @@ const LanguageSwitch = ({ closePopup }) => {
 
       {open && (
         <ul className="dropdown-menu">
-          {Object.keys(flagImages).map((lang) => (
+          {supportedLangs.map((lang) => (
             <li
               key={lang}
               className={`dropdown-item ${

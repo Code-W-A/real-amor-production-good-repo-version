@@ -210,12 +210,24 @@ export const QuizResultsDocument = ({ userData }) => {
                     {question.type === "image-selection" ? (
                       <View style={styles.imageOption}>
                         <Text style={styles.answer}>
-                          Réponse de l'utilisateur :
+                          Réponse de l'utilisateur :{" "}
+                          {(() => {
+                            const selectedIdx = question.options?.findIndex(
+                              (opt) =>
+                                typeof opt === "object" &&
+                                opt?.image === userAnswer?.answer
+                            );
+                            return selectedIdx >= 0
+                              ? `Option ${selectedIdx + 1}`
+                              : userAnswer?.answer || "N/A";
+                          })()}
                         </Text>
+                        {userAnswer?.answer ? (
                         <Image
-                          src={getImagePath(userAnswer?.answer)}
+                            src={getImagePath(userAnswer.answer)}
                           style={styles.image}
                         />
+                        ) : null}
                       </View>
                     ) : (
                       <Text style={styles.answer}>

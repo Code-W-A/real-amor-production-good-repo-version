@@ -8,6 +8,23 @@ import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument ";
 
+function formatFirestoreDate(value) {
+  if (!value) return null;
+  // Firestore Timestamp (from SDK): has toDate()
+  if (typeof value?.toDate === "function") {
+    return value.toDate().toLocaleDateString();
+  }
+  // Timestamp-like (has seconds)
+  if (typeof value?.seconds === "number") {
+    return new Date(value.seconds * 1000).toLocaleDateString();
+  }
+  // JS Date
+  if (value instanceof Date) {
+    return value.toLocaleDateString();
+  }
+  return null;
+}
+
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
   const uid = searchParams.get("uid"); // Extragem UID-ul din query-ul URL-ului
@@ -21,6 +38,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     showAlert: false,
   });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // Stare pentru dialogul de confirmare
+  const [currentlyInCouple, setCurrentlyInCouple] = useState(false);
 
   const router = useRouter();
 
@@ -37,6 +55,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
         console.log("user data....informatiii", userData);
         setUserData(userData); // Setăm datele utilizatorului
         setIsActivated(userData?.isActivated || false); // Setăm isActivated
+        setCurrentlyInCouple(!!userData?.currentlyInCouple);
       } else {
         console.error("User not found!");
       }
@@ -115,6 +134,18 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       setIsActivated(newIsActivated); // Actualizăm starea locală
     } catch (error) {
       console.error("Error updating isActivated:", error);
+    }
+  };
+
+  const toggleCurrentlyInCouple = async () => {
+    try {
+      const userDocRef = doc(db, "Users", uid);
+      const newValue = !currentlyInCouple;
+      await updateDoc(userDocRef, { currentlyInCouple: newValue });
+      setCurrentlyInCouple(newValue);
+      setUserData((prev) => ({ ...prev, currentlyInCouple: newValue }));
+    } catch (error) {
+      console.error("Error updating currentlyInCouple:", error);
     }
   };
 
@@ -356,6 +387,10 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             userData.subscriptionActive ||
             userData.subscriptionStatus === "canceledUntilEnd" ? (
               <>
+                {/*
+                  Lifetime users don't have subscriptionStartDate/subscriptionEndDate/subscriptionId/subscriptionAmount.
+                  They use lifetimePurchasedAt/lifetimeAmount/lifetimeSessionId instead.
+                */}
                 <p
                   style={{
                     fontSize: "22px",
@@ -383,73 +418,129 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                       textAlign: "start",
                     }}
                   >
-                    <strong>
-                      {translatedTexts.subscriptionStartDateText ||
-                        "Data de început"}
-                      :
-                    </strong>{" "}
-                    {new Date(
-                      userData.subscriptionStartDate.seconds * 1000
-                    ).toLocaleDateString()}
-                  </li>
-                  <li
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      textAlign: "start",
-                    }}
-                  >
-                    <strong>{translatedTexts.expiryDateText}:</strong>{" "}
-                    {new Date(
-                      userData.subscriptionEndDate.seconds * 1000
-                    ).toLocaleDateString()}
-                  </li>
-                  <li
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      textAlign: "start",
-                    }}
-                  >
                     <strong>{translatedTexts.subscriptionStatusText}:</strong>
-                    {userData.subscriptionStatus === "active"
+                    {userData.subscriptionStatus === "lifetime" ||
+                    userData.lifetimeAccess
+                      ? translatedTexts.lifetimeStatusText ||
+                        "Abonnement à vie"
+                      : userData.subscriptionStatus === "active"
                       ? translatedTexts.activeStatusText || "Activ"
                       : userData.subscriptionStatus === "canceledUntilEnd"
                       ? `${
                           translatedTexts.subscriptionCanceledUntilText ||
                           "Anulat până la"
-                        } ${new Date(
-                          userData.subscriptionEndDate.seconds * 1000
-                        ).toLocaleDateString()}`
+                        } ${formatFirestoreDate(userData?.subscriptionEndDate) || "-"}`
                       : userData.subscriptionStatus === "canceledImmediately"
                       ? translatedTexts.subscriptionCanceledImmediatelyText ||
                         "Anulat imediat"
                       : translatedTexts.subscriptionExpiredText || "Expirat"}
                   </li>
-                  <li
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      textAlign: "start",
-                    }}
-                  >
-                    <strong>{translatedTexts.subscriptionIdText}:</strong>{" "}
-                    {userData.subscriptionId}
-                  </li>
-                  <li
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      textAlign: "start",
-                    }}
-                  >
-                    <strong>
-                      {translatedTexts.subscriptionAmountText ||
-                        "Suma abonament"}
-                      :
-                    </strong>{" "}
-                    {userData.subscriptionAmount} EUR
-                  </li>
+
+                  {userData.subscriptionStatus === "lifetime" ||
+                  userData.lifetimeAccess ? (
+                    <>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>
+                          {translatedTexts.subscriptionStartDateText ||
+                            "Data de început"}
+                          :
+                        </strong>{" "}
+                        {formatFirestoreDate(userData?.lifetimePurchasedAt) ||
+                          "-"}
+                      </li>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>
+                          {translatedTexts.subscriptionIdText ||
+                            "Identifiant"}
+                          :
+                        </strong>{" "}
+                        {userData?.lifetimeSessionId || "-"}
+                      </li>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>
+                          {translatedTexts.subscriptionAmountText ||
+                            "Suma abonament"}
+                          :
+                        </strong>{" "}
+                        {typeof userData?.lifetimeAmount === "number"
+                          ? `${userData.lifetimeAmount} EUR`
+                          : "-"}
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>
+                          {translatedTexts.subscriptionStartDateText ||
+                            "Data de început"}
+                          :
+                        </strong>{" "}
+                        {formatFirestoreDate(userData?.subscriptionStartDate) ||
+                          "-"}
+                      </li>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>{translatedTexts.expiryDateText}:</strong>{" "}
+                        {formatFirestoreDate(userData?.subscriptionEndDate) ||
+                          "-"}
+                      </li>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>{translatedTexts.subscriptionIdText}:</strong>{" "}
+                        {userData?.subscriptionId || "-"}
+                      </li>
+                      <li
+                        style={{
+                          fontSize: "18px",
+                          fontWeight: "bold",
+                          textAlign: "start",
+                        }}
+                      >
+                        <strong>
+                          {translatedTexts.subscriptionAmountText ||
+                            "Suma abonament"}
+                          :
+                        </strong>{" "}
+                        {typeof userData?.subscriptionAmount === "number"
+                          ? `${userData.subscriptionAmount} EUR`
+                          : "-"}
+                      </li>
+                    </>
+                  )}
                 </ul>
               </>
             ) : (
@@ -534,6 +625,31 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                 : translatedTexts.deleteUserText}
             </button>
           </div>
+
+          {(userData?.lifetimeAccess === true ||
+            userData?.subscriptionStatus === "lifetime") && (
+            <div
+              className="col-12 mt-20"
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              <input
+                type="checkbox"
+                checked={currentlyInCouple}
+                onChange={toggleCurrentlyInCouple}
+                className="large-checkbox"
+                style={{
+                  width: "22px",
+                  height: "22px",
+                  marginRight: "10px",
+                  cursor: "pointer",
+                }}
+              />
+              <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+                {translatedTexts.currentlyInCoupleText ||
+                  "În prezent în cuplu"}
+              </span>
+            </div>
+          )}
         </form>
       </div>
       {showConfirmDialog && (

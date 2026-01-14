@@ -8,7 +8,6 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
-import { questions } from "@/data/quiz";
 import {
   collection,
   addDoc,
@@ -149,29 +148,6 @@ export default function ListCompatibilitati({
       color: "#666666",
     },
   });
-
-  // Document PDF generat local
-  const PDFDocument = (
-    <Document>
-      <Page style={styles.page}>
-        <Text style={styles.title}>
-          {translatedTexts.rezultateleChestionaruluiText} {data?.username}
-        </Text>
-        {questions &&
-          questions.map((question, index) => (
-            <View key={question.id}>
-              <Text style={styles.question}>
-                {index + 1}. {question.text || "Întrebare indisponibilă"}
-              </Text>
-              <Text style={styles.answer}>
-                {translatedTexts.raspunsulUtilizatoruluiText}:{" "}
-                {data?.responses?.[question.id] || "N/A"}
-              </Text>
-            </View>
-          ))}
-      </Page>
-    </Document>
-  );
 
   return (
     <tr>

@@ -7,10 +7,12 @@ import { useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import DotLoader from "react-spinners/DotLoader";
+import { db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // Cheia publică Stripe
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 );
 
 export default function Subscriptions({
@@ -25,8 +27,18 @@ export default function Subscriptions({
   translatedLinks,
 }) {
   // Un array care va reține starea pentru fiecare checkbox de pe card
-  const [isAccepted, setIsAccepted] = useState([false, false, false]);
+  const [isAccepted, setIsAccepted] = useState([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
   const [loading, setLoading] = useState(false); // Stare pentru a controla butonul de încărcare
+  const [promoLoading, setPromoLoading] = useState(true);
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [lifetimePromoEnabled, setLifetimePromoEnabled] = useState(false);
+  const [showLifetimeFloater, setShowLifetimeFloater] = useState(false);
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(true);
   const {
@@ -36,6 +48,66 @@ export default function Subscriptions({
     setUserData,
   } = useAuth();
 
+  useEffect(() => {
+    const loadPromo = async () => {
+      setPromoLoading(true);
+      try {
+        const snap = await getDoc(doc(db, "Config", "subscriptionPromo"));
+        if (snap.exists()) {
+          const data = snap.data();
+          setDiscountPercent(
+            Number.isFinite(Number(data?.discountPercent))
+              ? Number(data.discountPercent)
+              : 0
+          );
+          setLifetimePromoEnabled(!!data?.lifetimePromoEnabled);
+        } else {
+          setDiscountPercent(0);
+          setLifetimePromoEnabled(false);
+        }
+      } catch {
+        setDiscountPercent(0);
+        setLifetimePromoEnabled(false);
+      } finally {
+        setPromoLoading(false);
+      }
+    };
+    loadPromo();
+  }, []);
+
+  // Show/hide the lifetime "floater" button based on whether the lifetime section is in view.
+  useEffect(() => {
+    if (!lifetimePromoEnabled) {
+      setShowLifetimeFloater(false);
+      return;
+    }
+
+    const el = document.getElementById("lifetime-plan");
+    if (!el) {
+      setShowLifetimeFloater(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((e) => e.isIntersecting);
+        setShowLifetimeFloater(!isVisible);
+      },
+      { root: null, threshold: 0.2 }
+    );
+
+    observer.observe(el);
+    setShowLifetimeFloater(true);
+    return () => observer.disconnect();
+  }, [lifetimePromoEnabled]);
+
+  const scrollToLifetime = () => {
+    const el = document.getElementById("lifetime-plan");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   // Funcția de schimbare a stării unui checkbox
   const handleCheckboxChange = (index) => {
     const newIsAccepted = [...isAccepted];
@@ -44,7 +116,12 @@ export default function Subscriptions({
   };
 
   // Funcția de inițiere a checkout-ului
-  const initiateCheckout = async (priceId, index, subName) => {
+  const initiateCheckout = async (
+    planKey,
+    index,
+    subName,
+    opts = { type: "subscription", cancelAtPeriodEndOnCreate: false }
+  ) => {
     if (!isAccepted[index]) return; // Dacă checkbox-ul pentru cardul respectiv nu este bifat, nu permite inițierea checkout-ului
 
     try {
@@ -57,23 +134,47 @@ export default function Subscriptions({
       const stripe = await stripePromise;
       setLoading(true); // Setează loading la true înainte de a face cererea
 
-      const response = await fetch("/api/create-checkout-subscription", {
+      const token = await currentUser?.getIdToken?.();
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      const endpoint =
+        opts?.type === "lifetime"
+          ? "/api/create-checkout-lifetime"
+          : "/api/create-checkout-subscription";
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          priceId, // Trimitem priceId-ul corect pentru planul selectat
+          planKey, // Server selects correct priceId based on STRIPE_MODE (test/live)
           nume: userData.username,
           email: userData.email,
           phone: userData.phone,
           uid: userData.uid,
           subName,
+          ...(opts?.type === "subscription" &&
+          opts?.cancelAtPeriodEndOnCreate
+            ? { cancelAtPeriodEndOnCreate: true }
+            : {}),
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Eroare: ${response.status} - ${response.statusText}`);
+        // Try to surface server error details (e.g. Stripe price misconfigured)
+        let details = "";
+        try {
+          const errJson = await response.json();
+          details =
+            typeof errJson?.error === "string" ? ` - ${errJson.error}` : "";
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(`Eroare: ${response.status} - ${response.statusText}${details}`);
       }
 
       const data = await response.json();
@@ -121,7 +222,7 @@ export default function Subscriptions({
 
   return (
     <section className="layout-pt-lg pt-40 layout-pb-md">
-      <div className="container">
+      <div className="container-fluid px-30">
         <div className="row justify-center text-center">
           <div className="col-auto">
             <div className="sectionTitle ">
@@ -135,7 +236,19 @@ export default function Subscriptions({
         </div>
 
         {/* Carduri de prețuri */}
-        <div className="row y-gap-30 justify-center pt-60 lg:pt-40">
+        <div className="pt-60 lg:pt-40">
+          {/* Row 1: Regular subscriptions in a single horizontal row */}
+          <div
+            style={{
+              display: "grid",
+              gridAutoFlow: "column",
+              gridAutoColumns: "minmax(320px, 1fr)",
+              gap: 30,
+              overflowX: "auto",
+              paddingBottom: 10,
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
           {/* Card 1 - Basic Plan */}
           {/* <div className="col-lg-4 col-md-6">
             <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
@@ -207,7 +320,7 @@ export default function Subscriptions({
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
                         initiateCheckout(
-                          "price_1QHP25KKcy7exYrbKfuDuuH1",
+                          "TEST",
                           0,
                           "ABONAMENT TEST"
                         )
@@ -221,7 +334,7 @@ export default function Subscriptions({
             </div>
           </div> */}
           {/* Card 1 - Basic Plan */}
-          <div className="col-lg-4 col-md-6">
+          <div>
             <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
               <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
                 <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
@@ -291,7 +404,7 @@ export default function Subscriptions({
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
                         initiateCheckout(
-                          "price_1QJK6PKKcy7exYrbPL8F9ONA",
+                          "SUB_3M",
                           0,
                           translatedLinks.abonament3
                         )
@@ -306,7 +419,7 @@ export default function Subscriptions({
           </div>
 
           {/* Card 2 - Pro Plan */}
-          <div className="col-lg-4 col-md-6">
+          <div>
             <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
               <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
                 <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
@@ -379,7 +492,7 @@ export default function Subscriptions({
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
                         initiateCheckout(
-                          "price_1QJK7KKKcy7exYrbBWNkHnS4",
+                          "SUB_6M",
                           1,
                           translatedLinks.abonament6
                         )
@@ -393,7 +506,7 @@ export default function Subscriptions({
             </div>
           </div>
           {/* Card 3 - Pro Plan */}
-          <div className="col-lg-4 col-md-6">
+          <div>
             <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
               <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
                 <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
@@ -470,7 +583,7 @@ export default function Subscriptions({
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
                         initiateCheckout(
-                          "price_1QJK8tKKcy7exYrbPfh2vZUl",
+                          "SUB_12M",
                           2,
                           translatedLinks.abonament12
                         )
@@ -483,7 +596,214 @@ export default function Subscriptions({
               </div>
             </div>
           </div>
+
+          {/* Card 4 - 1 an fara reinnoire */}
+          <div>
+            <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
+              <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
+                <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
+                  {translatedLinks.abonament1anNoRenew ||
+                    "Abonnement 12 mois (sans renouvellement)"}
+                </div>
+                <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
+                  12 mois
+                </div>
+                {discountPercent > 0 && (
+                  <div className="mt-10 text-14 text-purple-1">
+                    Promo: -{discountPercent}%
+                  </div>
+                )}
+
+                <div className="text-left y-gap-15 mt-35">
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature1}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature2}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature3}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature4}
+                  </div>
+                </div>
+
+                <div className="terms-acceptance mt-20">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={isAccepted[3]}
+                      onChange={() => handleCheckboxChange(3)}
+                    />{" "}
+                    {acceptTermsText}
+                  </label>
+                </div>
+
+                <div className="d-inline-block mt-30">
+                  {!isAccepted[3] && (
+                    <button
+                      className="button px-40 py-20 fw-500 disabled-button"
+                      disabled
+                    >
+                      {getStarted}
+                    </button>
+                  )}
+                  {isAccepted[3] && (
+                    <button
+                      className="button px-40 py-20 fw-500 -purple-1"
+                      onClick={() =>
+                        initiateCheckout(
+                          "SUB_12M_NO_RENEW",
+                          3,
+                          translatedLinks.abonament1anNoRenew ||
+                            "Abonnement 12 mois (sans renouvellement)",
+                          {
+                            type: "subscription",
+                            cancelAtPeriodEndOnCreate: true,
+                          }
+                        )
+                      }
+                    >
+                      {getStarted}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+          {/* Row 2: Lifetime (separate row) */}
+          {lifetimePromoEnabled && (
+            <div id="lifetime-plan" className="mt-40">
+              <div className="row justify-center">
+                <div className="col-12">
+                  <div className="text-center mb-20">
+                    <h3 className="text-22 fw-700 text-dark-1">
+                      {translatedLinks.abonamentLifetime || "Abonnement à vie"}
+                    </h3>
+                    <div className="text-14 text-light-1 mt-5">
+                      {translatedLinks.lifetimeSectionHint ||
+                        "Accès illimité (paiement unique)"}
+                    </div>
+                  </div>
+                </div>
+                <div className="col-auto">
+                  <div style={{ maxWidth: 420 }}>
+                    <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
+                      <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
+                        <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
+                          {translatedLinks.abonamentLifetime || "Abonnement à vie"}
+                        </div>
+                        <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
+                          Lifetime
+                        </div>
+                        {discountPercent > 0 && (
+                          <div className="mt-10 text-14 text-purple-1">
+                            Promo: -{discountPercent}%
+                          </div>
+                        )}
+
+                        <div className="text-left y-gap-15 mt-35">
+                          <div>
+                            <i className="text-purple-1 fa fa-check pr-8"></i>
+                            {translatedLinks.oneTimeFeature1}
+                          </div>
+                          <div>
+                            <i className="text-purple-1 fa fa-check pr-8"></i>
+                            {translatedLinks.oneTimeFeature2}
+                          </div>
+                          <div>
+                            <i className="text-purple-1 fa fa-check pr-8"></i>
+                            {translatedLinks.oneTimeFeature3}
+                          </div>
+                          <div>
+                            <i className="text-purple-1 fa fa-check pr-8"></i>
+                            {translatedLinks.oneTimeFeature4}
+                          </div>
+                        </div>
+
+                        <div className="terms-acceptance mt-20">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={isAccepted[4]}
+                              onChange={() => handleCheckboxChange(4)}
+                            />{" "}
+                            {acceptTermsText}
+                          </label>
+                        </div>
+
+                        <div className="d-inline-block mt-30">
+                          {!isAccepted[4] && (
+                            <button
+                              className="button px-40 py-20 fw-500 disabled-button"
+                              disabled
+                            >
+                              {getStarted}
+                            </button>
+                          )}
+                          {isAccepted[4] && (
+                            <button
+                              className="button px-40 py-20 fw-500 -purple-1"
+                              onClick={() =>
+                                initiateCheckout(
+                                  "LIFETIME",
+                                  4,
+                                  translatedLinks.abonamentLifetime ||
+                                    "Abonnement à vie",
+                                  { type: "lifetime" }
+                                )
+                              }
+                            >
+                              {getStarted}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Floating CTA to scroll to lifetime */}
+        {lifetimePromoEnabled && showLifetimeFloater && (
+          <button
+            type="button"
+            onClick={scrollToLifetime}
+            className="button -md -purple-1 text-white lifetime-floater-btn"
+            style={{
+              position: "fixed",
+              right: 20,
+              bottom: 20,
+              zIndex: 9999,
+              borderRadius: 999,
+              padding: "12px 18px",
+              boxShadow: "0px 10px 30px rgba(100, 64, 251, 0.4)",
+              transition: "all 0.3s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow =
+                "0px 15px 40px rgba(100, 64, 251, 0.7)";
+              e.currentTarget.style.transform = "scale(1.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow =
+                "0px 10px 30px rgba(100, 64, 251, 0.4)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            {translatedLinks.lifetimeFloaterCta || "Vrei abonament pe viață?"}
+          </button>
+        )}
       </div>
     </section>
   );

@@ -10,7 +10,7 @@ import { DotLoader } from "react-spinners";
 
 // Verifică dacă variabila de mediu este definită
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 );
 
 export default function Pricing({
@@ -54,11 +54,16 @@ export default function Pricing({
       });
       const stripe = await stripePromise;
       setLoading(true); // Setează loading la true înainte de a face cererea
+      const token = await currentUser?.getIdToken?.();
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
 
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           costRezervare: price * 100, // Convertim în bani (de exemplu, 10000 pentru 100 RON)

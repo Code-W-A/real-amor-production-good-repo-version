@@ -154,6 +154,10 @@ export default async function page({ params }) {
       "Stare abonament utilizator",
       targetLanguage
     ),
+    currentlyInCoupleText: await fetchTranslation(
+      "În prezent în cuplu",
+      targetLanguage
+    ),
   };
 
   return (
