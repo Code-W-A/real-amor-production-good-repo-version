@@ -7,6 +7,8 @@ import AlertBox from "@/components/uiElements/AlertBox";
 import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument ";
+import { useAuth } from "@/context/AuthContext";
+import { DotLoader } from "react-spinners";
 
 function formatFirestoreDate(value) {
   if (!value) return null;
@@ -28,10 +30,14 @@ function formatFirestoreDate(value) {
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
   const uid = searchParams.get("uid"); // Extragem UID-ul din query-ul URL-ului
+  const { currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true); // Loader pentru a afișa în timp ce datele sunt preluate
   const [isActivated, setIsActivated] = useState(false); // Stare pentru a gestiona isActivated
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
+  const [showCancelSubscriptionDialog, setShowCancelSubscriptionDialog] =
+    useState(false);
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -73,6 +79,64 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       console.log("User deleted from Firestore successfully.");
     } catch (error) {
       console.error("Error deleting user from Firestore:", error);
+    }
+  };
+
+  const adminCancelSubscription = async () => {
+    if (!uid) return;
+    if (!userData?.subscriptionId) {
+      setAlertMessage({
+        type: "danger",
+        content: "Aucun abonnement actif trouvé pour cet utilisateur.",
+        showAlert: true,
+      });
+      return;
+    }
+    if (userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess) {
+      setAlertMessage({
+        type: "danger",
+        content: "Cet utilisateur a un abonnement à vie.",
+        showAlert: true,
+      });
+      return;
+    }
+    try {
+      setIsCancelingSubscription(true);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/admin-cancel-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid, subscriptionId: userData.subscriptionId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to cancel subscription");
+      }
+
+      // Refresh local view from Firestore
+      await fetchUserData(uid);
+
+      setAlertMessage({
+        type: "success",
+        content:
+          "Abonnement annulé (le renouvellement automatique est désactivé).",
+        showAlert: true,
+      });
+    } catch (error) {
+      setAlertMessage({
+        type: "danger",
+        content: `Erreur: ${error.message}`,
+        showAlert: true,
+      });
+      console.error("Error canceling subscription (admin):", error);
+    } finally {
+      setIsCancelingSubscription(false);
+      setShowCancelSubscriptionDialog(false);
     }
   };
 
@@ -542,6 +606,38 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                     </>
                   )}
                 </ul>
+
+                {/* Admin action: cancel user's subscription */}
+                {userData?.subscriptionStatus !== "lifetime" &&
+                !userData?.lifetimeAccess &&
+                userData?.subscriptionId &&
+                userData?.subscriptionStatus === "active" ? (
+                  <div className="col-12 mt-20">
+                    {isCancelingSubscription ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <DotLoader color="#c13365" size={24} />
+                        <span style={{ fontWeight: "bold" }}>
+                          Annulation en cours...
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="button -md -red-1 text-white"
+                        onClick={() => setShowCancelSubscriptionDialog(true)}
+                      >
+                        {translatedTexts.cancelSubscriptionText ||
+                          "Annuler l'abonnement"}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
               </>
             ) : (
               <p
@@ -685,6 +781,52 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               onClick={() => setShowConfirmDialog(false)} // Închide dialogul
             >
               {translatedTexts.cancelText}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showCancelSubscriptionDialog && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 1000,
+            backgroundColor: "white",
+            padding: "20px",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+            borderRadius: "8px",
+            width: "420px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontWeight: "bold" }}>
+            Confirmer l'annulation de l'abonnement pour cet utilisateur ?
+          </p>
+          <p style={{ marginTop: 8 }}>
+            Cela désactivera le renouvellement automatique (Stripe:
+            cancel_at_period_end).
+          </p>
+          <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+            <button
+              className="button -md -red-1 text-white"
+              onClick={adminCancelSubscription}
+              disabled={isCancelingSubscription}
+            >
+              Annuler l'abonnement
+            </button>
+            <button
+              className="button -md -gray-1 text-dark-1"
+              onClick={() => setShowCancelSubscriptionDialog(false)}
+              disabled={isCancelingSubscription}
+            >
+              Fermer
             </button>
           </div>
         </div>
