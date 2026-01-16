@@ -31,37 +31,37 @@ export default async function Page({ params }) {
     ),
     signUpText: await fetchTranslation("Sign Up", targetLanguage),
     alreadyHaveAccountText: await fetchTranslation(
-      "Ai deja un cont?",
+      "Vous avez déjà un compte ?",
       targetLanguage
     ),
-    conectText: await fetchTranslation("Conectează-te", targetLanguage),
-    registerText: await fetchTranslation("Înregistrează-te", targetLanguage),
+    conectText: await fetchTranslation("Se connecter", targetLanguage),
+    registerText: await fetchTranslation("S'inscrire", targetLanguage),
     emailPlaceholder: await fetchTranslation("Email", targetLanguage),
     emailAdresaPlaceholder: await fetchTranslation(
-      "Adresă email",
+      "Adresse e-mail",
       targetLanguage
     ),
     usernamePlaceholder: await fetchTranslation(
-      "Nume utilizator",
+      "Nom d'utilisateur",
       targetLanguage
     ),
-    passwordPlaceholder: await fetchTranslation("Parolă", targetLanguage),
+    passwordPlaceholder: await fetchTranslation("Mot de passe", targetLanguage),
     confirmPasswordPlaceholder: await fetchTranslation(
-      "Confirmă Parola",
+      "Confirmez le mot de passe",
       targetLanguage
     ),
-    phonePlaceholder: await fetchTranslation("Telefon", targetLanguage),
-    aboutMePlaceholder: await fetchTranslation("Adresa", targetLanguage),
+    phonePlaceholder: await fetchTranslation("Téléphone", targetLanguage),
+    aboutMePlaceholder: await fetchTranslation("Adresse", targetLanguage),
     videoPlaceholder: await fetchTranslation(
-      "Adaugă video de prezentare",
+      "Ajouter une vidéo de présentation",
       targetLanguage
     ),
     pozePlaceholder: await fetchTranslation(
-      "Adaugă poze(prima poza va servi ca poza principala, apasa pe alte poze pentru a schimba poza principala)",
+      "Ajouter des photos (la première photo sera la photo principale ; cliquez sur une autre photo pour changer la photo principale)",
       targetLanguage
     ),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     lang: targetLanguage,
     userNameRequired: await fetchTranslation(
       "Username is required",
@@ -80,26 +80,26 @@ export default async function Page({ params }) {
       targetLanguage
     ),
     completeazaCampuri: await fetchTranslation(
-      "Te rugăm să completezi toate câmpurile corect.",
+      "Veuillez remplir correctement tous les champs.",
       targetLanguage
     ),
     utilizatorInregistrat: await fetchTranslation(
-      "Utilizator înregistrat cu succes!",
+      "Utilisateur enregistré avec succès !",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
     getNecesarText: await fetchTranslation(
-      "Genul este necesar",
+      "Le genre est obligatoire",
       targetLanguage
     ),
     genText: await fetchTranslation("Gender", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
-    selecteazaText: await fetchTranslation("Selecteaza", targetLanguage),
+    selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),
     scopNecesarText: await fetchTranslation(
-      "Scopul este necesar",
+      "L'objectif est obligatoire",
       targetLanguage
     ),
     scopText: await fetchTranslation("Je cherche", targetLanguage),

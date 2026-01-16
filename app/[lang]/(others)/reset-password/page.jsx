@@ -15,39 +15,39 @@ export default async function Page({ params }) {
   // Obține traducerile necesare
   const translatedLinks = {
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     emailText: await fetchTranslation("Email", targetLanguage),
     resetPasswordHeader: await fetchTranslation(
-      "Resetare Parolă",
+      "Réinitialisation du mot de passe",
       targetLanguage
     ),
     sendResetText: await fetchTranslation(
-      "Trimite email de resetare",
+      "Envoyer l'e-mail de réinitialisation",
       targetLanguage
     ),
     successMessage: await fetchTranslation(
-      "Un email de resetare a parolei a fost trimis!",
+      "Un e-mail de réinitialisation du mot de passe a été envoyé !",
       targetLanguage
     ),
     errorMessage: await fetchTranslation(
-      "Eroare la resetarea parolei: ",
+      "Erreur lors de la réinitialisation du mot de passe : ",
       targetLanguage
     ),
     loginRedirectText: await fetchTranslation(
-      "Înapoi la autentificare",
+      "Retour à la connexion",
       targetLanguage
     ),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
     getNecesarText: await fetchTranslation(
-      "Genul este necesar",
+      "Le genre est obligatoire",
       targetLanguage
     ),
     genText: await fetchTranslation("Gender", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
-    selecteazaText: await fetchTranslation("Selecteaza", targetLanguage),
+    selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),
     scopNecesarText: await fetchTranslation(
-      "Scopul este necesar",
+      "L'objectif est obligatoire",
       targetLanguage
     ),
     scopText: await fetchTranslation("Je cherche", targetLanguage),
@@ -63,8 +63,8 @@ export default async function Page({ params }) {
       "Je cherche à élargir mon cercle d’amis.",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
   };
 
   return (

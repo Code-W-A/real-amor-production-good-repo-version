@@ -17,25 +17,25 @@ export default async function Page({ params }) {
     emailText: await fetchTranslation("Email", targetLanguage),
     parolaText: await fetchTranslation("Password", targetLanguage),
     autentificareText: await fetchTranslation(
-      "Autentificare ADMIN",
+      "Connexion ADMIN",
       targetLanguage
     ),
-    aiContText: await fetchTranslation("Nu ai un cont încă?", targetLanguage),
-    inscrieText: await fetchTranslation("Înscrie-te gratuit", targetLanguage),
+    aiContText: await fetchTranslation("Vous n'avez pas encore de compte ?", targetLanguage),
+    inscrieText: await fetchTranslation("Inscrivez-vous gratuitement", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     lang: targetLanguage,
     autentificareReusita: await fetchTranslation(
-      "Autentificare reușită!",
+      "Connexion réussie !",
       targetLanguage
     ),
     autentificareEsuata: await fetchTranslation(
-      "Autentificare eșuată: ",
+      "Connexion échouée : ",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

@@ -11,43 +11,43 @@ export default async function Page({ params }) {
   const targetLanguage = params.lang || "en";
 
   const translatedLinks = {
-    home: await fetchTranslation("Acasă", targetLanguage),
+    home: await fetchTranslation("Accueil", targetLanguage),
     realAmor: await fetchTranslation("RealAmor", targetLanguage),
-    pricing: await fetchTranslation("Plata finalizata", targetLanguage),
+    pricing: await fetchTranslation("Paiement finalisé", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
-    paymentTitle: await fetchTranslation("Plată Finalizată", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
+    paymentTitle: await fetchTranslation("Paiement finalisé", targetLanguage),
     paymentText: await fetchTranslation(
-      "Vă mulțumim pentru plata efectuată! Vă rugăm să continuați cu rezervarea dumneavoastră.",
+      "Merci pour votre paiement ! Veuillez continuer avec votre réservation.",
       targetLanguage
     ),
     paymentConfirmation: await fetchTranslation(
-      "Confirmare de plată",
+      "Confirmation de paiement",
       targetLanguage
     ),
     loadingText: await fetchTranslation(
-      "Se încarcă detaliile plății...",
+      "Chargement des détails du paiement...",
       targetLanguage
     ),
     successText: await fetchTranslation(
-      "Plata dumneavoastră a fost procesată cu succes. Un email cu factura și confirmarea plății a fost trimis la adresa dvs. Vă rugăm să verificați căsuța de email pentru mai multe detalii.",
+      "Votre paiement a été traité avec succès. Un e-mail contenant la facture et la confirmation de paiement a été envoyé à votre adresse. Veuillez vérifier votre boîte mail pour plus de détails.",
       targetLanguage
     ),
     continueBookingText: await fetchTranslation(
-      "Continuă cu Rezervarea",
+      "Continuer la réservation",
       targetLanguage
     ),
     detaliiRezervareText: await fetchTranslation(
-      "Detalii rezervare:",
+      "Détails de la réservation :",
       targetLanguage
     ),
-    nameText: await fetchTranslation("Nume", targetLanguage),
+    nameText: await fetchTranslation("Nom", targetLanguage),
     emailText: await fetchTranslation("Email", targetLanguage),
-    phoneText: await fetchTranslation("Telefon", targetLanguage),
-    amountPaidText: await fetchTranslation("Sumă plătită", targetLanguage),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    phoneText: await fetchTranslation("Téléphone", targetLanguage),
+    amountPaidText: await fetchTranslation("Montant payé", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

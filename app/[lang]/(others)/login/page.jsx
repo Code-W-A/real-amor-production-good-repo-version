@@ -15,28 +15,28 @@ export default async function Page({ params }) {
   const translatedLinks = {
     emailText: await fetchTranslation("Email", targetLanguage),
     parolaText: await fetchTranslation("Password", targetLanguage),
-    autentificareText: await fetchTranslation("Autentificare", targetLanguage),
-    aiContText: await fetchTranslation("Nu ai un cont încă?", targetLanguage),
-    inscrieText: await fetchTranslation("Înscrie-te gratuit", targetLanguage),
+    autentificareText: await fetchTranslation("Se connecter", targetLanguage),
+    aiContText: await fetchTranslation("Vous n'avez pas encore de compte ?", targetLanguage),
+    inscrieText: await fetchTranslation("Inscrivez-vous gratuitement", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     lang: targetLanguage,
     autentificareReusita: await fetchTranslation(
-      "Autentificare reușită!",
+      "Connexion réussie !",
       targetLanguage
     ),
     autentificareEsuata: await fetchTranslation(
-      "Autentificare eșuată: ",
+      "Connexion échouée : ",
       targetLanguage
     ),
     aiUitatParolText: await fetchTranslation(
-      "Ai uitat parola? ",
+      "Mot de passe oublié ? ",
       targetLanguage
     ),
-    resetPassText: await fetchTranslation("Reseteaza parola ", targetLanguage),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    resetPassText: await fetchTranslation("Réinitialiser le mot de passe", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

@@ -10,41 +10,41 @@ export default async function Page({ params }) {
 
   const translatedLinks = {
     reservationTitle: await fetchTranslation(
-      "Rezervare Confirmată",
+      "Réservation confirmée",
       targetLanguage
     ),
     reservationText: await fetchTranslation(
-      "Vă mulțumim pentru rezervarea efectuată! Detaliile rezervării sunt afișate mai jos.",
+      "Merci pour votre réservation ! Les détails de la réservation sont affichés ci-dessous.",
       targetLanguage
     ),
     reservationConfirmation: await fetchTranslation(
-      "Confirmare Rezervare",
+      "Confirmation de réservation",
       targetLanguage
     ),
     approvalPendingText: await fetchTranslation(
-      "Veți fi anunțat atunci când contul va fi aprobat.",
+      "Vous serez informé lorsque votre compte sera approuvé.",
       targetLanguage
     ),
     loadingText: await fetchTranslation(
-      "Se încarcă detaliile rezervării...",
+      "Chargement des détails de la réservation...",
       targetLanguage
     ),
     successText: await fetchTranslation(
       "Nous vous remercions pour votre demande de rendez-vous. Suite à votre entretien avec nos experts, votre compte sera activé.",
       targetLanguage
     ),
-    homePageText: await fetchTranslation("Către Cont", targetLanguage),
-    detailsText: await fetchTranslation("Detalii rezervare:", targetLanguage),
-    nameText: await fetchTranslation("Nume", targetLanguage),
+    homePageText: await fetchTranslation("Aller au compte", targetLanguage),
+    detailsText: await fetchTranslation("Détails de la réservation :", targetLanguage),
+    nameText: await fetchTranslation("Nom", targetLanguage),
     emailText: await fetchTranslation("Email", targetLanguage),
-    phoneText: await fetchTranslation("Telefon", targetLanguage),
-    dateText: await fetchTranslation("Data", targetLanguage),
-    timeText: await fetchTranslation("Ora", targetLanguage),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    phoneText: await fetchTranslation("Téléphone", targetLanguage),
+    dateText: await fetchTranslation("Date", targetLanguage),
+    timeText: await fetchTranslation("Heure", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
   };
 
   return (

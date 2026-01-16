@@ -13,7 +13,7 @@ export default async function Page({ params }) {
   console.log("targe lagn..", targetLanguage);
 
   const translatedLinks = {
-    home: await fetchTranslation("Acasa", targetLanguage),
+    home: await fetchTranslation("Accueil", targetLanguage),
     realAmor: await fetchTranslation("RealAmor", targetLanguage),
     pricing: await fetchTranslation("Pricing", targetLanguage),
     lang: targetLanguage,
@@ -43,7 +43,7 @@ export default async function Page({ params }) {
     ),
     getStarted: await fetchTranslation("Get Started Now", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
 
     bookingText: await fetchTranslation(
       "Ouverture de dossier et premier Rendez-vous en présentiel",
@@ -54,9 +54,9 @@ export default async function Page({ params }) {
       "Accept Terms and Conditions, Privacy Policy, and Cookies",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

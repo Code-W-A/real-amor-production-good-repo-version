@@ -16,24 +16,24 @@ export default async function page({ params }) {
   console.log("target...language...", targetLanguage);
   // Obținem traducerile pentru textele statice
   const translatedTexts = {
-    title: await fetchTranslation("Lista utilizatori", targetLanguage),
-    description: await fetchTranslation("Lista utilizatori", targetLanguage),
+    title: await fetchTranslation("Liste des utilisateurs", targetLanguage),
+    description: await fetchTranslation("Liste des utilisateurs", targetLanguage),
     sidebarText: await fetchTranslation("Sidebar", targetLanguage),
     myCoursesText: await fetchTranslation("My Courses", targetLanguage),
     headerDashboardText: await fetchTranslation("Dashboard", targetLanguage),
     realAmorText: await fetchTranslation("Real Amor", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    adminText: await fetchTranslation("Panou administrare", targetLanguage),
-    usersText: await fetchTranslation("Utilizatori", targetLanguage),
+    adminText: await fetchTranslation("Panneau d'administration", targetLanguage),
+    usersText: await fetchTranslation("Utilisateurs", targetLanguage),
     disconnectText: await fetchTranslation("Se Déconnecter", targetLanguage),
     listaUtilizatoriText: await fetchTranslation(
-      "Lista utilizatori",
+      "Liste des utilisateurs",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

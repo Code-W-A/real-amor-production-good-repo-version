@@ -21,24 +21,24 @@ export default async function page({ params }) {
       "Download quiz answers",
       targetLanguage
     ),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
     listaCompatibilitatiText: await fetchTranslation(
-      "Lista Compatibilitati",
+      "Liste des compatibilités",
       targetLanguage
     ),
     deconectareText: await fetchTranslation("Se Déconnecter", targetLanguage),
     chatText: await fetchTranslation("Chat", targetLanguage),
     profileText: await fetchTranslation("Profile", targetLanguage),
     getNecesarText: await fetchTranslation(
-      "Genul este necesar",
+      "Le genre est obligatoire",
       targetLanguage
     ),
     genText: await fetchTranslation("Gender", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
-    selecteazaText: await fetchTranslation("Selecteaza", targetLanguage),
+    selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),
     scopNecesarText: await fetchTranslation(
-      "Scopul este necesar",
+      "L'objectif est obligatoire",
       targetLanguage
     ),
     scopText: await fetchTranslation("Je cherche", targetLanguage),
@@ -54,19 +54,19 @@ export default async function page({ params }) {
       "Je cherche à élargir mon cercle d’amis.",
       targetLanguage
     ),
-    title: await fetchTranslation("Lista utilizatori", targetLanguage),
-    description: await fetchTranslation("Lista utilizatori", targetLanguage),
+    title: await fetchTranslation("Liste des utilisateurs", targetLanguage),
+    description: await fetchTranslation("Liste des utilisateurs", targetLanguage),
     sidebarText: await fetchTranslation("Sidebar", targetLanguage),
     myCoursesText: await fetchTranslation("My Courses", targetLanguage),
     headerDashboardText: await fetchTranslation("Dashboard", targetLanguage),
     realAmorText: await fetchTranslation("Real Amor", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    adminText: await fetchTranslation("Panou administrare", targetLanguage),
-    usersText: await fetchTranslation("Utilizatori", targetLanguage),
-    disconnectText: await fetchTranslation("Deconectare", targetLanguage),
+    adminText: await fetchTranslation("Panneau d'administration", targetLanguage),
+    usersText: await fetchTranslation("Utilisateurs", targetLanguage),
+    disconnectText: await fetchTranslation("Déconnexion", targetLanguage),
     listaUtilizatoriText: await fetchTranslation(
-      "Lista utilizatori",
+      "Liste des utilisateurs",
       targetLanguage
     ),
     userNameText: await fetchTranslation("User Name", targetLanguage),
@@ -87,12 +87,12 @@ export default async function page({ params }) {
       targetLanguage
     ),
     deactivateContText: await fetchTranslation(
-      "Dezactiveaza Cont",
+      "Désactiver le compte",
       targetLanguage
     ),
-    contActivText: await fetchTranslation("Cont activat", targetLanguage),
+    contActivText: await fetchTranslation("Compte activé", targetLanguage),
     contDezactivatText: await fetchTranslation(
-      "Cont dezactivat",
+      "Compte désactivé",
       targetLanguage
     ),
     successDeleteUserText: await fetchTranslation(
@@ -132,52 +132,52 @@ export default async function page({ params }) {
       "Subscription ID",
       targetLanguage
     ),
-    planText: await fetchTranslation("Tip abonament", targetLanguage),
+    planText: await fetchTranslation("Type d'abonnement", targetLanguage),
     expiryDateText: await fetchTranslation(
-      "Data expirării abonamentului",
+      "Date d'expiration de l'abonnement",
       targetLanguage
     ),
     cancelSubscriptionText: await fetchTranslation(
-      "Anulează abonamentul utilizatorului",
+      "Annuler l'abonnement de l'utilisateur",
       targetLanguage
     ),
-    cancelingText: await fetchTranslation("Anulare în curs...", targetLanguage),
+    cancelingText: await fetchTranslation("Annulation en cours...", targetLanguage),
     noSubscriptionText: await fetchTranslation(
-      "Utilizatorul nu are un abonament activ",
+      "L'utilisateur n'a pas d'abonnement actif",
       targetLanguage
     ),
     buySubscriptionText: await fetchTranslation(
-      "Achiziționează un abonament pentru utilizator",
+      "Acheter un abonnement pour l'utilisateur",
       targetLanguage
     ),
     accountNotActivatedText: await fetchTranslation(
-      "Contul utilizatorului nu este activat",
+      "Le compte de l'utilisateur n'est pas activé",
       targetLanguage
     ),
     subscriptionCanceledImmediatelyText: await fetchTranslation(
-      "Abonament anulat imediat",
+      "Abonnement annulé immédiatement",
       targetLanguage
     ),
     subscriptionExpiredText: await fetchTranslation(
-      "Abonament expirat",
+      "Abonnement expiré",
       targetLanguage
     ),
     subscriptionStatusText: await fetchTranslation(
-      "Stare abonament utilizator",
+      "Statut de l'abonnement de l'utilisateur",
       targetLanguage
     ),
     chatText: await fetchTranslation("Chat", targetLanguage),
-    eliminaCompLoading: await fetchTranslation("Se elimină...", targetLanguage),
+    eliminaCompLoading: await fetchTranslation("Suppression...", targetLanguage),
     eliminaComp: await fetchTranslation(
-      "Elimină compatibilitatea",
+      "Supprimer la compatibilité",
       targetLanguage
     ),
     eliminaCompSuccess: await fetchTranslation(
-      "Compatibilitatea a fost eliminată cu succes",
+      "La compatibilité a été supprimée avec succès",
       targetLanguage
     ),
     eliminaCompError: await fetchTranslation(
-      "A apărut o eroare la eliminarea compatibilității.",
+      "Une erreur est survenue lors de la suppression de la compatibilité.",
       targetLanguage
     ),
   };

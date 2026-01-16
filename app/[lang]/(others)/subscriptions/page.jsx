@@ -13,7 +13,7 @@ export default async function Page({ params }) {
   console.log("targe lagn..", targetLanguage);
 
   const translatedLinks = {
-    home: await fetchTranslation("Acasa", targetLanguage),
+    home: await fetchTranslation("Accueil", targetLanguage),
     realAmor: await fetchTranslation("RealAmor", targetLanguage),
     pricing: await fetchTranslation("Subscriptions", targetLanguage),
     lang: targetLanguage,
@@ -66,9 +66,9 @@ export default async function Page({ params }) {
       "Conseils des l'équipe de RealAmor pour améliorer vos chances de réussite",
       targetLanguage
     ),
-    getStarted: await fetchTranslation("Ma inregistrez acum", targetLanguage),
+    getStarted: await fetchTranslation("Je m'inscris maintenant", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
 
     // Traducerea textului pentru bifa termenilor și condițiilor
     acceptTermsText: await fetchTranslation(
@@ -84,7 +84,7 @@ export default async function Page({ params }) {
     ),
     abonamentLifetime: await fetchTranslation("Abonnement à vie", targetLanguage),
     lifetimeFloaterCta: await fetchTranslation(
-      "Vrei abonament pe viață?",
+      "Vous voulez un abonnement à vie ?",
       targetLanguage
     ),
     lifetimeSectionHint: await fetchTranslation(
@@ -92,9 +92,9 @@ export default async function Page({ params }) {
       targetLanguage
     ),
     monthText: await fetchTranslation("month", targetLanguage),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
   };
 
   return (

@@ -31,56 +31,56 @@ export default async function page({ params }) {
       targetLanguage
     ),
     realAmorText: await fetchTranslation("Real Amor", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    usernameLabel: await fetchTranslation("Nume utilizator", targetLanguage),
-    phoneLabel: await fetchTranslation("Telefon", targetLanguage),
-    aboutMeLabel: await fetchTranslation("Despre mine", targetLanguage),
-    addressLabel: await fetchTranslation("Adresa", targetLanguage),
+    usernameLabel: await fetchTranslation("Nom d'utilisateur", targetLanguage),
+    phoneLabel: await fetchTranslation("Téléphone", targetLanguage),
+    aboutMeLabel: await fetchTranslation("À propos de moi", targetLanguage),
+    addressLabel: await fetchTranslation("Adresse", targetLanguage),
     updateProfileText: await fetchTranslation(
-      "Actualizează profilul",
+      "Mettre à jour le profil",
       targetLanguage
     ),
     successMessage: await fetchTranslation(
-      "Profil actualizat cu succes!",
+      "Profil mis à jour avec succès !",
       targetLanguage
     ),
     imageAddedMessage: await fetchTranslation(
-      "Imagine adăugată cu succes!",
+      "Image ajoutée avec succès !",
       targetLanguage
     ),
     videoAddedMessage: await fetchTranslation(
-      "Videoclip adăugat cu succes!",
+      "Vidéo ajoutée avec succès !",
       targetLanguage
     ),
     errorMessage: await fetchTranslation(
-      "Eroare la actualizarea profilului",
+      "Erreur lors de la mise à jour du profil",
       targetLanguage
     ),
     usernameRequired: await fetchTranslation(
-      "Numele utilizatorului este obligatoriu",
+      "Le nom d'utilisateur est obligatoire",
       targetLanguage
     ),
     phoneRequired: await fetchTranslation(
-      "Numărul de telefon este obligatoriu",
+      "Le numéro de téléphone est obligatoire",
       targetLanguage
     ),
     aboutMeRequired: await fetchTranslation(
-      "Secțiunea Despre mine este obligatorie",
+      "La section « À propos de moi » est obligatoire",
       targetLanguage
     ),
     addressRequired: await fetchTranslation(
-      "Secțiunea Adresa este obligatorie",
+      "La section « Adresse » est obligatoire",
       targetLanguage
     ),
     completeFieldsError: await fetchTranslation(
-      "Te rugăm să completezi toate câmpurile corect.",
+      "Veuillez remplir correctement tous les champs.",
       targetLanguage
     ),
     // Traducerile pentru SidebarClient
-    contText: await fetchTranslation("Cont", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
     listaCompatibilitatiText: await fetchTranslation(
-      "Lista Compatibilitati",
+      "Liste des compatibilités",
       targetLanguage
     ),
     chatText: await fetchTranslation("Chat", targetLanguage),
@@ -217,15 +217,15 @@ export default async function page({ params }) {
       targetLanguage
     ),
     getNecesarText: await fetchTranslation(
-      "Genul este necesar",
+      "Le genre est obligatoire",
       targetLanguage
     ),
     genText: await fetchTranslation("Gender", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
-    selecteazaText: await fetchTranslation("Selecteaza", targetLanguage),
+    selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),
     scopNecesarText: await fetchTranslation(
-      "Scopul este necesar",
+      "L'objectif est obligatoire",
       targetLanguage
     ),
     scopText: await fetchTranslation("Je cherche", targetLanguage),
@@ -241,16 +241,16 @@ export default async function page({ params }) {
       "Je cherche à élargir mon cercle d’amis.",
       targetLanguage
     ),
-    signUpText: await fetchTranslation("Sign up", targetLanguage),
-    logInText: await fetchTranslation("Log in", targetLanguage),
-    contText: await fetchTranslation("Cont", targetLanguage),
-    newSubText: await fetchTranslation("Abonament nou", targetLanguage),
+    signUpText: await fetchTranslation("S'inscrire", targetLanguage),
+    logInText: await fetchTranslation("Se connecter", targetLanguage),
+    contText: await fetchTranslation("Compte", targetLanguage),
+    newSubText: await fetchTranslation("Nouvel abonnement", targetLanguage),
     confirmationCancelSubText: await fetchTranslation(
-      "Sigur dorești să anulezi abonamentul?",
+      "Êtes-vous sûr de vouloir annuler l'abonnement ?",
       targetLanguage
     ),
-    cancelSub: await fetchTranslation("Anulează abonamentul", targetLanguage),
-    nuAnulaText: await fetchTranslation("Nu anula", targetLanguage),
+    cancelSub: await fetchTranslation("Annuler l'abonnement", targetLanguage),
+    nuAnulaText: await fetchTranslation("Ne pas annuler", targetLanguage),
     pozePlaceholder: await fetchTranslation(
       "Ajouter une photo",
       targetLanguage
@@ -268,46 +268,46 @@ export default async function page({ params }) {
       targetLanguage
     ),
     reactivatingText: await fetchTranslation(
-      "Se reactiveaza abonamentul...",
+      "Réactivation de l'abonnement...",
       targetLanguage
     ),
     subscriptionReactivatedSuccessText: await fetchTranslation(
-      "Abonament reactivat cu success",
+      "Abonnement réactivé avec succès",
       targetLanguage
     ),
     listCompText: await fetchTranslation(
-      "Lista Compatibilități",
+      "Liste des compatibilités",
       targetLanguage
     ),
-    numeText: await fetchTranslation("Nume", targetLanguage),
-    genText: await fetchTranslation("Gen", targetLanguage),
-    statusText: await fetchTranslation("Status", targetLanguage),
+    numeText: await fetchTranslation("Nom", targetLanguage),
+    genText: await fetchTranslation("Genre", targetLanguage),
+    statusText: await fetchTranslation("Statut", targetLanguage),
     compatibilitateText: await fetchTranslation(
-      "Compatibilitate",
+      "Compatibilité",
       targetLanguage
     ),
-    actiuniText: await fetchTranslation("Acțiuni", targetLanguage),
-    veziDetaliiText: await fetchTranslation("Vezi detalii", targetLanguage),
-    descarcaPDFText: await fetchTranslation("Descarcă PDF", targetLanguage),
-    generarePDFText: await fetchTranslation("Generare PDF...", targetLanguage),
+    actiuniText: await fetchTranslation("Actions", targetLanguage),
+    veziDetaliiText: await fetchTranslation("Voir détails", targetLanguage),
+    descarcaPDFText: await fetchTranslation("Télécharger PDF", targetLanguage),
+    generarePDFText: await fetchTranslation("Génération PDF...", targetLanguage),
     marcheazăCompatibilitateText: await fetchTranslation(
-      "Marchează compatibilitate",
+      "Marquer la compatibilité",
       targetLanguage
     ),
     eliminaCompatibilitateText: await fetchTranslation(
-      "Elimina compatibilitate",
+      "Supprimer la compatibilité",
       targetLanguage
     ),
     raspunsulUtilizatoruluiText: await fetchTranslation(
-      "Răspunsul utilizatorului",
+      "Réponse de l'utilisateur",
       targetLanguage
     ),
     rezultateleChestionaruluiText: await fetchTranslation(
-      "Rezultatele Chestionărului pentru",
+      "Résultats du questionnaire pour",
       targetLanguage
     ),
     rezultateleChestionaruluiText: await fetchTranslation(
-      "Rezultatele Chestionărului pentru",
+      "Résultats du questionnaire pour",
       targetLanguage
     ),
   };

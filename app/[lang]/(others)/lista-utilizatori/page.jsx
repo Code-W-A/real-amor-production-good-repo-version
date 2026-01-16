@@ -15,35 +15,35 @@ export default async function page({ params }) {
   console.log("target...language...", targetLanguage);
   // Obținem traducerile pentru textele statice
   const translatedTexts = {
-    title: await fetchTranslation("Lista utilizatori", targetLanguage),
-    description: await fetchTranslation("Lista utilizatori", targetLanguage),
+    title: await fetchTranslation("Liste des utilisateurs", targetLanguage),
+    description: await fetchTranslation("Liste des utilisateurs", targetLanguage),
     sidebarText: await fetchTranslation("Sidebar", targetLanguage),
     myCoursesText: await fetchTranslation("My Courses", targetLanguage),
     headerDashboardText: await fetchTranslation("Dashboard", targetLanguage),
     realAmorText: await fetchTranslation("Real Amor", targetLanguage),
-    methodeText: await fetchTranslation("Methode", targetLanguage),
+    methodeText: await fetchTranslation("Méthode", targetLanguage),
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
-    adminText: await fetchTranslation("Panou administrare", targetLanguage),
-    usersText: await fetchTranslation("Utilizatori", targetLanguage),
-    disconnectText: await fetchTranslation("Deconectare", targetLanguage),
+    adminText: await fetchTranslation("Panneau d'administration", targetLanguage),
+    usersText: await fetchTranslation("Utilisateurs", targetLanguage),
+    disconnectText: await fetchTranslation("Déconnexion", targetLanguage),
     listaUtilizatoriText: await fetchTranslation(
-      "Lista utilizatori",
+      "Liste des utilisateurs",
       targetLanguage
     ),
     searchText: await fetchTranslation("Search by username", targetLanguage),
     userText: await fetchTranslation("User name", targetLanguage),
     emailText: await fetchTranslation("E-mail", targetLanguage),
-    actiuniText: await fetchTranslation("Actiuni", targetLanguage),
+    actiuniText: await fetchTranslation("Actions", targetLanguage),
     registrationDateText: await fetchTranslation(
-      "Data înregistrării",
+      "Date d'inscription",
       targetLanguage
     ),
-    contActivText: await fetchTranslation("Status cont", targetLanguage),
-    contActivText1: await fetchTranslation("Cont activat", targetLanguage),
-    contActivText2: await fetchTranslation("Cont neactivat", targetLanguage),
-    veziDetaliiText: await fetchTranslation("Vezi Detalii", targetLanguage),
-    genText: await fetchTranslation("Gen", targetLanguage),
-    scopText: await fetchTranslation("Scop", targetLanguage),
+    contActivText: await fetchTranslation("Statut du compte", targetLanguage),
+    contActivText1: await fetchTranslation("Compte activé", targetLanguage),
+    contActivText2: await fetchTranslation("Compte non activé", targetLanguage),
+    veziDetaliiText: await fetchTranslation("Voir détails", targetLanguage),
+    genText: await fetchTranslation("Genre", targetLanguage),
+    scopText: await fetchTranslation("Objectif", targetLanguage),
   };
 
   return (
