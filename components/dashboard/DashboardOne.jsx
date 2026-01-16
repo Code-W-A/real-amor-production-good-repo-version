@@ -24,6 +24,7 @@ export default function DashboardOne() {
     const adminUids = new Set([
       "SJTAqVztndgxISJAtnGzaSKieV02",
       "feSm5lY3F7aFrWNWneYw8qbPkiT2",
+      "AcjykpO4W4M5JWCFPg0ZuxZVmiz1"
     ]);
     if (!loading && !adminUids.has(currentUser?.user?.uid)) {
       router.push("/login-admin");
