@@ -107,6 +107,13 @@ exports.updateUserSubscriptions = functions.pubsub
 
       for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data();
+
+        // Lifetime users are managed outside Stripe subscriptions.
+        // Important: do NOT let Stripe polling overwrite lifetime access/status.
+        if (userData?.lifetimeAccess === true || userData?.subscriptionStatus === "lifetime") {
+          continue;
+        }
+
         const subscriptionId = userData.subscriptionId;
 
         if (!subscriptionId) continue;
