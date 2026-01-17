@@ -76,6 +76,9 @@ export async function POST(request) {
       automatic_tax: {
         enabled: true,
       },
+      invoice_creation: {
+        enabled: true,
+      },
       success_url: `${origin}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/subscriptions`,
     });

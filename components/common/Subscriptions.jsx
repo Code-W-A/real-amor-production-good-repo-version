@@ -37,7 +37,8 @@ export default function Subscriptions({
   const [loading, setLoading] = useState(false); // Stare pentru a controla butonul de încărcare
   const [promoLoading, setPromoLoading] = useState(true);
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [lifetimePromoEnabled, setLifetimePromoEnabled] = useState(false);
+  const [globalLifetimePromoEnabled, setGlobalLifetimePromoEnabled] =
+    useState(false);
   const [showLifetimeFloater, setShowLifetimeFloater] = useState(false);
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(true);
@@ -60,20 +61,35 @@ export default function Subscriptions({
               ? Number(data.discountPercent)
               : 0
           );
-          setLifetimePromoEnabled(!!data?.lifetimePromoEnabled);
+          setGlobalLifetimePromoEnabled(!!data?.lifetimePromoEnabled);
         } else {
           setDiscountPercent(0);
-          setLifetimePromoEnabled(false);
+          setGlobalLifetimePromoEnabled(false);
         }
       } catch {
         setDiscountPercent(0);
-        setLifetimePromoEnabled(false);
+        setGlobalLifetimePromoEnabled(false);
       } finally {
         setPromoLoading(false);
       }
     };
     loadPromo();
   }, []);
+
+  // Per-user override:
+  // - true => force show lifetime
+  // - false => force hide lifetime
+  // - undefined => follow global config
+  const userLifetimeOfferEnabled =
+    typeof userData?.lifetimeOfferEnabled === "boolean"
+      ? userData.lifetimeOfferEnabled
+      : null;
+  const lifetimePromoEnabled =
+    userLifetimeOfferEnabled === true
+      ? true
+      : userLifetimeOfferEnabled === false
+      ? false
+      : globalLifetimePromoEnabled;
 
   // Show/hide the lifetime "floater" button based on whether the lifetime section is in view.
   useEffect(() => {

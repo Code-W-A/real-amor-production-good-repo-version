@@ -36,10 +36,8 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [isActivated, setIsActivated] = useState(false); // Stare pentru a gestiona isActivated
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
-  const [isGrantingLifetime, setIsGrantingLifetime] = useState(false);
   const [showCancelSubscriptionDialog, setShowCancelSubscriptionDialog] =
     useState(false);
-  const [showGrantLifetimeDialog, setShowGrantLifetimeDialog] = useState(false);
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -47,6 +45,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   });
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // Stare pentru dialogul de confirmare
   const [currentlyInCouple, setCurrentlyInCouple] = useState(false);
+  const [isUpdatingLifetimeOffer, setIsUpdatingLifetimeOffer] = useState(false);
 
   const router = useRouter();
 
@@ -142,55 +141,37 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
-  const adminGrantLifetime = async () => {
+  const adminSetLifetimeOffer = async (enabled) => {
     if (!uid) return;
-    if (userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess) {
-      setAlertMessage({
-        type: "danger",
-        content:
-          translatedTexts?.grantLifetimeAlreadyText ||
-          "Cet utilisateur a déjà un accès à vie.",
-        showAlert: true,
-      });
-      return;
-    }
     try {
-      setIsGrantingLifetime(true);
+      setIsUpdatingLifetimeOffer(true);
       const token = await currentUser?.getIdToken?.();
       if (!token) throw new Error("Not authenticated");
 
-      const res = await fetch("/api/admin-set-lifetime", {
+      const res = await fetch("/api/admin-set-lifetime-offer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ uid }),
+        body: JSON.stringify({ uid, enabled: !!enabled }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
-        throw new Error(data?.error || "Failed to grant lifetime access");
+        throw new Error(data?.error || "Failed to update lifetime offer");
       }
 
+      // Refresh local view from Firestore
       await fetchUserData(uid);
-
-      setAlertMessage({
-        type: "success",
-        content:
-          translatedTexts?.grantLifetimeSuccessText ||
-          "Abonnement à vie activé pour cet utilisateur.",
-        showAlert: true,
-      });
     } catch (error) {
       setAlertMessage({
         type: "danger",
         content: `Erreur: ${error.message}`,
         showAlert: true,
       });
-      console.error("Error granting lifetime (admin):", error);
+      console.error("Error updating lifetime offer (admin):", error);
     } finally {
-      setIsGrantingLifetime(false);
-      setShowGrantLifetimeDialog(false);
+      setIsUpdatingLifetimeOffer(false);
     }
   };
 
@@ -716,34 +697,26 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             </p>
           )}
 
-          {userData &&
-          userData?.subscriptionStatus !== "lifetime" &&
-          !userData?.lifetimeAccess ? (
-            <div className="col-12 mt-20">
-              {isGrantingLifetime ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  <DotLoader color="#c13365" size={24} />
-                  <span style={{ fontWeight: "bold" }}>
-                    {translatedTexts?.grantLifetimeInProgressText ||
-                      "Activation en cours..."}
-                  </span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="button -md -purple-1 text-white"
-                  onClick={() => setShowGrantLifetimeDialog(true)}
-                >
-                  {translatedTexts?.grantLifetimeText ||
-                    "Activer l'abonnement à vie"}
-                </button>
-              )}
+          {userData ? (
+            <div
+              className="col-12 mt-20"
+              style={{ display: "flex", alignItems: "center", gap: 12 }}
+            >
+              <input
+                type="checkbox"
+                className="large-checkbox"
+                style={{ width: 22, height: 22, cursor: "pointer" }}
+                checked={!!userData?.lifetimeOfferEnabled}
+                disabled={isUpdatingLifetimeOffer}
+                onChange={(e) => adminSetLifetimeOffer(e.target.checked)}
+              />
+              <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+                {translatedTexts?.lifetimeOfferLabelText ||
+                  "Autoriser l'offre “abonnement à vie” (ce compte uniquement)"}
+              </span>
+              {isUpdatingLifetimeOffer ? (
+                <DotLoader color="#c13365" size={18} />
+              ) : null}
             </div>
           ) : null}
 
@@ -912,53 +885,6 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               disabled={isCancelingSubscription}
             >
               Fermer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showGrantLifetimeDialog && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            zIndex: 1000,
-            backgroundColor: "white",
-            padding: "20px",
-            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
-            borderRadius: "8px",
-            width: "420px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-          }}
-        >
-          <p style={{ fontWeight: "bold" }}>
-            {translatedTexts?.grantLifetimeConfirmText ||
-              "Confirmer l'activation de l'abonnement à vie pour cet utilisateur ?"}
-          </p>
-          <p style={{ marginTop: 8 }}>
-            {translatedTexts?.grantLifetimeHintText ||
-              "Cela activera l'accès à vie pour ce compte."}
-          </p>
-          <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
-            <button
-              className="button -md -purple-1 text-white"
-              onClick={adminGrantLifetime}
-              disabled={isGrantingLifetime}
-            >
-              {translatedTexts?.grantLifetimeConfirmButtonText || "Activer"}
-            </button>
-            <button
-              className="button -md -gray-1 text-dark-1"
-              onClick={() => setShowGrantLifetimeDialog(false)}
-              disabled={isGrantingLifetime}
-            >
-              {translatedTexts.cancelText || "Cancel"}
             </button>
           </div>
         </div>

@@ -157,6 +157,10 @@ export default async function page({ params }) {
       "Cet utilisateur a déjà un accès à vie.",
       targetLanguage
     ),
+    lifetimeOfferLabelText: await fetchTranslation(
+      "Autoriser l'offre « abonnement à vie » (ce compte uniquement)",
+      targetLanguage
+    ),
     cancelingText: await fetchTranslation("Annulation en cours...", targetLanguage),
     noSubscriptionText: await fetchTranslation(
       "L'utilisateur n'a pas d'abonnement actif",

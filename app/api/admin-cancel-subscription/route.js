@@ -3,25 +3,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getStripe } from "../_utils/stripeUtils";
-
-function getAdminUidSet() {
-  // Optional override via env (comma-separated UIDs)
-  const raw = process.env.ADMIN_UIDS;
-  if (raw) {
-    return new Set(
-      raw
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    );
-  }
-
-  // Fallback: keep in sync with the admin UI allowlist.
-  return new Set([
-    "SJTAqVztndgxISJAtnGzaSKieV02",
-    "feSm5lY3F7aFrWNWneYw8qbPkiT2",
-  ]);
-}
+import { getAdminUidSet } from "../_utils/adminUids";
 
 export async function POST(request) {
   try {
