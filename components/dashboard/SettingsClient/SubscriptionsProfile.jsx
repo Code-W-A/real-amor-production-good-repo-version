@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AlertBox from "@/components/uiElements/AlertBox";
 import { DotLoader } from "react-spinners";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+);
 
 export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const { userData, setUserData, currentUser } = useAuth();
@@ -13,6 +18,11 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const [loading, setLoading] = useState(true);
   const [canceling, setCanceling] = useState(false); // Stare pentru spinner-ul de anulare
   const [reactivating, setReactivating] = useState(false); // Stare pentru spinner-ul de anulare
+  const [buyingLifetime, setBuyingLifetime] = useState(false);
+  const [lifetimeAccepted, setLifetimeAccepted] = useState(false);
+  const [promoLoading, setPromoLoading] = useState(true);
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [globalLifetimeEnabled, setGlobalLifetimeEnabled] = useState(false);
   const router = useRouter();
   const [alertMessage, setAlertMessage] = useState({
     type: "",
@@ -22,6 +32,33 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // Stare pentru dialogul de confirmare
 
   const confirmCancelSubscription = () => setShowConfirmDialog(true); // Afișează dialogul
+
+  useEffect(() => {
+    const loadPromo = async () => {
+      setPromoLoading(true);
+      try {
+        const snap = await getDoc(doc(db, "Config", "subscriptionPromo"));
+        if (snap.exists()) {
+          const data = snap.data() || {};
+          setDiscountPercent(
+            Number.isFinite(Number(data?.discountPercent))
+              ? Number(data.discountPercent)
+              : 0
+          );
+          setGlobalLifetimeEnabled(!!data?.lifetimePromoEnabled);
+        } else {
+          setDiscountPercent(0);
+          setGlobalLifetimeEnabled(false);
+        }
+      } catch {
+        setDiscountPercent(0);
+        setGlobalLifetimeEnabled(false);
+      } finally {
+        setPromoLoading(false);
+      }
+    };
+    loadPromo();
+  }, []);
 
   const cancelSubscription = async () => {
     setCanceling(true);
@@ -188,6 +225,149 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
     }
   };
 
+  const canShowLifetimeOffer = () => {
+    const alreadyLifetime =
+      userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess;
+    if (alreadyLifetime) return false;
+
+    const userOverride =
+      typeof userData?.lifetimeOfferEnabled === "boolean"
+        ? userData.lifetimeOfferEnabled
+        : null;
+    const lifetimeEnabled =
+      userOverride === true
+        ? true
+        : userOverride === false
+        ? false
+        : globalLifetimeEnabled;
+
+    return !!lifetimeEnabled;
+  };
+
+  const initiateLifetimeCheckout = async () => {
+    if (!lifetimeAccepted) return;
+    try {
+      if (!stripePromise) {
+        throw new Error(
+          "Stripe is not initialized. Please check your API key."
+        );
+      }
+      const stripe = await stripePromise;
+      setBuyingLifetime(true);
+
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/create-checkout-lifetime", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planKey: "LIFETIME",
+          subName: translatedTexts?.abonamentLifetimeText || "Abonnement à vie",
+        }),
+      });
+
+      if (!res.ok) {
+        let details = "";
+        try {
+          const errJson = await res.json();
+          details =
+            typeof errJson?.error === "string" ? ` - ${errJson.error}` : "";
+        } catch {
+          // ignore
+        }
+        throw new Error(
+          `Eroare: ${res.status} - ${res.statusText}${details}`
+        );
+      }
+
+      const data = await res.json();
+      if (data?.id) {
+        await stripe.redirectToCheckout({ sessionId: data.id });
+      } else {
+        throw new Error("Eroare la inițierea checkout-ului");
+      }
+    } catch (err) {
+      console.error("Eroare la inițierea checkout-ului lifetime", err);
+      setAlertMessage({
+        type: "danger",
+        content: err?.message || "Eroare la inițierea checkout-ului",
+        showAlert: true,
+      });
+    } finally {
+      setBuyingLifetime(false);
+    }
+  };
+
+  const LifetimeOfferCard = () => {
+    if (!canShowLifetimeOffer()) return null;
+
+    return (
+      <div className="mt-30">
+        <div style={{ maxWidth: 520 }}>
+          <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
+            <div className="priceCard__content py-30 px-30 text-center">
+              <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
+                {translatedTexts?.abonamentLifetimeText || "Abonnement à vie"}
+              </div>
+              <div className="text-14 text-light-1 mt-5">
+                {translatedTexts?.lifetimeSectionHintText ||
+                  "Accès illimité (paiement unique)"}
+              </div>
+
+              {!promoLoading && discountPercent > 0 && (
+                <div className="mt-10 text-14 text-purple-1">
+                  Promo: -{discountPercent}%
+                </div>
+              )}
+
+              <div className="terms-acceptance mt-20">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={lifetimeAccepted}
+                    onChange={() => setLifetimeAccepted(!lifetimeAccepted)}
+                  />{" "}
+                  {translatedTexts?.acceptTermsText ||
+                    "Accept Terms and Conditions, Privacy Policy, and Cookies"}
+                </label>
+              </div>
+
+              <div className="d-inline-block mt-20">
+                <button
+                  type="button"
+                  className={`button px-30 py-15 fw-500 ${
+                    lifetimeAccepted ? "-purple-1" : "disabled-button"
+                  }`}
+                  disabled={!lifetimeAccepted || buyingLifetime}
+                  onClick={initiateLifetimeCheckout}
+                >
+                  {buyingLifetime ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <DotLoader color="#ffffff" size={18} />
+                      {translatedTexts?.processingText || "Processing..."}
+                    </span>
+                  ) : (
+                    translatedTexts?.getStartedText || "Je m'inscris maintenant"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className={`tabs__pane -tab-item-4 ${activeTab == 4 ? "is-active" : ""}`}
@@ -298,14 +478,18 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                       </Link>
                     )}
                   </div>
+                  <LifetimeOfferCard />
                 </>
               ) : (
-                <p>
-                  {translatedTexts.noSubscriptionText}{" "}
-                  <Link className="buy-sub" href="/subscriptions">
-                    {translatedTexts.buySubscriptionText}
-                  </Link>
-                </p>
+                <>
+                  <p>
+                    {translatedTexts.noSubscriptionText}{" "}
+                    <Link className="buy-sub" href="/subscriptions">
+                      {translatedTexts.buySubscriptionText}
+                    </Link>
+                  </p>
+                  <LifetimeOfferCard />
+                </>
               )
             ) : (
               <p>{translatedTexts.accountNotActivatedText}</p>

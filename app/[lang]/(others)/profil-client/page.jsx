@@ -193,6 +193,23 @@ export default async function page({ params }) {
       "Buy a subscription here",
       targetLanguage
     ),
+    abonamentLifetimeText: await fetchTranslation(
+      "Abonnement à vie",
+      targetLanguage
+    ),
+    lifetimeSectionHintText: await fetchTranslation(
+      "Accès illimité (paiement unique)",
+      targetLanguage
+    ),
+    getStartedText: await fetchTranslation(
+      "Je m'inscris maintenant",
+      targetLanguage
+    ),
+    acceptTermsText: await fetchTranslation(
+      "Accept Terms and Conditions, Privacy Policy, and Cookies",
+      targetLanguage
+    ),
+    processingText: await fetchTranslation("Processing...", targetLanguage),
     accountNotActivatedText: await fetchTranslation(
       "Votre compte n'est pas encore activé, vous pourrez acheter un abonnement uniquement après le rendez-vous en présentiel",
       targetLanguage
