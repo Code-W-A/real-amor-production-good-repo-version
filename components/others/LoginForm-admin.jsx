@@ -48,7 +48,7 @@ export default function LoginFormAdmin({
       );
       // Preluăm datele utilizatorului din Firestore
       console.log("userCredential...", userCredential.user.uid);
-      setCurrentUser(userCredential);
+      setCurrentUser(userCredential.user);
       setAlertMessage({
         type: "success",
         content: translatedLinks.autentificareReusita,

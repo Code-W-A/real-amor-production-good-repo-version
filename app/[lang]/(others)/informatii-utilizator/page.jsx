@@ -129,6 +129,34 @@ export default async function page({ params }) {
       "Annuler l'abonnement de l'utilisateur",
       targetLanguage
     ),
+    grantLifetimeText: await fetchTranslation(
+      "Activer l'abonnement à vie",
+      targetLanguage
+    ),
+    grantLifetimeConfirmText: await fetchTranslation(
+      "Confirmer l'activation de l'abonnement à vie pour cet utilisateur ?",
+      targetLanguage
+    ),
+    grantLifetimeHintText: await fetchTranslation(
+      "Cela activera l'accès à vie pour ce compte.",
+      targetLanguage
+    ),
+    grantLifetimeConfirmButtonText: await fetchTranslation(
+      "Activer",
+      targetLanguage
+    ),
+    grantLifetimeInProgressText: await fetchTranslation(
+      "Activation en cours...",
+      targetLanguage
+    ),
+    grantLifetimeSuccessText: await fetchTranslation(
+      "Abonnement à vie activé pour cet utilisateur.",
+      targetLanguage
+    ),
+    grantLifetimeAlreadyText: await fetchTranslation(
+      "Cet utilisateur a déjà un accès à vie.",
+      targetLanguage
+    ),
     cancelingText: await fetchTranslation("Annulation en cours...", targetLanguage),
     noSubscriptionText: await fetchTranslation(
       "L'utilisateur n'a pas d'abonnement actif",
