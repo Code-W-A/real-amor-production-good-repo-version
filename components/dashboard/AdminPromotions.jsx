@@ -18,7 +18,8 @@ export default function AdminPromotions({ translatedTexts }) {
   const t = (key, fallback) => translatedTexts?.[key] || fallback;
 
   const percentOptions = useMemo(
-    () => [0, 5, 10, 15, 20, 25, 30, 40, 50],
+    // Keep options aligned with business needs (Stripe supports 0..100).
+    () => [0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100],
     []
   );
 
@@ -154,6 +155,11 @@ export default function AdminPromotions({ translatedTexts }) {
                     <option key={p} value={p}>
                       {p === 0
                         ? t("discountNoneOption", "Fără reducere")
+                        : p === 100
+                        ? `100% ${t("discountSuffix", "reducere")} ${t(
+                            "discountFreeHint",
+                            "(gratuit)"
+                          )}`
                         : `${p}% ${t("discountSuffix", "reducere")}`}
                     </option>
                   ))}

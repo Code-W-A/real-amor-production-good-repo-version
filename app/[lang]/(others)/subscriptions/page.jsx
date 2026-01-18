@@ -43,7 +43,7 @@ export default async function Page({ params }) {
       targetLanguage
     ),
     oneTimeFeature3: await fetchTranslation(
-      "Rendez-vous en présentiel",
+      "Rendez-vous en visioconférence avec notre équipe neuroscientifique.",
       targetLanguage
     ),
     oneTimeFeature4: await fetchTranslation(
@@ -91,7 +91,8 @@ export default async function Page({ params }) {
       "Accès illimité (paiement unique)",
       targetLanguage
     ),
-    monthText: await fetchTranslation("month", targetLanguage),
+    monthText: await fetchTranslation("mois", targetLanguage),
+    lifetimeDurationText: await fetchTranslation("à vie", targetLanguage),
     signUpText: await fetchTranslation("S'inscrire", targetLanguage),
     logInText: await fetchTranslation("Se connecter", targetLanguage),
     contText: await fetchTranslation("Compte", targetLanguage),

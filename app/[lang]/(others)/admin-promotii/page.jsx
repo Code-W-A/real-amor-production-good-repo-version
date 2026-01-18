@@ -17,20 +17,27 @@ export default async function page({ params }) {
     promotionsText: await fetchTranslation("Promotions", targetLanguage),
     promoTitle: await fetchTranslation("Promotions abonnements", targetLanguage),
     promoDesc: await fetchTranslation(
-      "Définissez la réduction (%) appliquée dans Stripe et activez/désactivez la promotion à vie.",
+      "Définissez la réduction (%) appliquée dans Stripe (elle s'applique à tous les abonnements) et activez/désactivez l'affichage de l'offre « à vie ».",
       targetLanguage
     ),
     discountPercentLabel: await fetchTranslation("Réduction abonnements", targetLanguage),
-    discountPercentHint: await fetchTranslation("Pourcentage appliqué dans Stripe", targetLanguage),
+    discountPercentHint: await fetchTranslation(
+      "Pourcentage appliqué dans Stripe (tous les abonnements, y compris « à vie » si l'offre est visible)",
+      targetLanguage
+    ),
     discountPercentValueLabel: await fetchTranslation("Pourcentage de réduction :", targetLanguage),
     discountNoneOption: await fetchTranslation("Aucune réduction", targetLanguage),
     discountSuffix: await fetchTranslation("réduction", targetLanguage),
+    discountFreeHint: await fetchTranslation("(gratuit)", targetLanguage),
     discountAppliedHint: await fetchTranslation(
-      "La réduction sera appliquée automatiquement au paiement",
+      "La réduction sera appliquée automatiquement au paiement (tous les abonnements)",
       targetLanguage
     ),
     lifetimePromoLabel: await fetchTranslation('Promotion « À vie »', targetLanguage),
-    lifetimePromoHint: await fetchTranslation('Afficher la carte « 1 an = à vie »', targetLanguage),
+    lifetimePromoHint: await fetchTranslation(
+      "Afficher/masquer l'offre « abonnement à vie » (n'active pas de réduction)",
+      targetLanguage
+    ),
     statusLabel: await fetchTranslation("Statut :", targetLanguage),
     statusActive: await fetchTranslation("ACTIF", targetLanguage),
     statusInactive: await fetchTranslation("INACTIF", targetLanguage),
