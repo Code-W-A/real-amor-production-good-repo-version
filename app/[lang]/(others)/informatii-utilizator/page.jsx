@@ -190,6 +190,21 @@ export default async function page({ params }) {
       "Actuellement en couple",
       targetLanguage
     ),
+    adminNotesLabelText: await fetchTranslation(
+      "Notes (admin uniquement)",
+      targetLanguage
+    ),
+    adminNotesPlaceholderText: await fetchTranslation(
+      "Notes internes (non visibles par le client)…",
+      targetLanguage
+    ),
+    adminNotesSaveText: await fetchTranslation("Enregistrer", targetLanguage),
+    adminNotesSavingText: await fetchTranslation("Enregistrement...", targetLanguage),
+    adminNotesLoadingText: await fetchTranslation("Chargement...", targetLanguage),
+    adminNotesSavedText: await fetchTranslation("Notes sauvegardées.", targetLanguage),
+    adminNotesStatusSavingText: await fetchTranslation("Enregistrement...", targetLanguage),
+    adminNotesStatusSavedText: await fetchTranslation("Sauvegardé", targetLanguage),
+    adminNotesStatusErrorText: await fetchTranslation("Erreur d'enregistrement", targetLanguage),
   };
 
   return (

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { useSearchParams } from "next/navigation"; // Folosim useSearchParams în loc de useRouter
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { deleteDoc, doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
 import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul configurat pentru Firebase
 import AlertBox from "@/components/uiElements/AlertBox";
@@ -46,6 +46,12 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false); // Stare pentru dialogul de confirmare
   const [currentlyInCouple, setCurrentlyInCouple] = useState(false);
   const [isUpdatingLifetimeOffer, setIsUpdatingLifetimeOffer] = useState(false);
+  const [adminNotes, setAdminNotes] = useState("");
+  const [isLoadingAdminNotes, setIsLoadingAdminNotes] = useState(false);
+  const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false);
+  const [adminNotesSaveError, setAdminNotesSaveError] = useState("");
+  const lastSavedAdminNotesRef = useRef("");
+  const notesSaveTimeoutRef = useRef(null);
 
   const router = useRouter();
 
@@ -175,6 +181,60 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
+  const loadAdminNotes = async (uid) => {
+    if (!uid) return;
+    try {
+      setIsLoadingAdminNotes(true);
+      setAdminNotesSaveError("");
+      const token = await currentUser?.getIdToken?.();
+      if (!token) return;
+
+      const res = await fetch(
+        `/api/admin-user-notes?uid=${encodeURIComponent(uid)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      if (res.ok && typeof data?.notes === "string") {
+        setAdminNotes(data.notes);
+        lastSavedAdminNotesRef.current = data.notes;
+      }
+    } catch (e) {
+      console.error("Failed to load admin notes:", e);
+    } finally {
+      setIsLoadingAdminNotes(false);
+    }
+  };
+
+  const saveAdminNotes = async (nextNotes) => {
+    if (!uid) return false;
+    try {
+      setIsSavingAdminNotes(true);
+      setAdminNotesSaveError("");
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/admin-user-notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid, notes: nextNotes }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to save notes");
+      }
+      lastSavedAdminNotesRef.current = String(nextNotes || "");
+      return true;
+    } catch (e) {
+      setAdminNotesSaveError(e?.message || "Failed to save notes");
+      return false;
+    } finally {
+      setIsSavingAdminNotes(false);
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!uid) return;
     setShowConfirmDialog(false);
@@ -238,9 +298,24 @@ export default function EditProfile({ activeTab, translatedTexts }) {
 
   const toggleCurrentlyInCouple = async () => {
     try {
-      const userDocRef = doc(db, "Users", uid);
       const newValue = !currentlyInCouple;
-      await updateDoc(userDocRef, { currentlyInCouple: newValue });
+
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/admin-set-currently-in-couple", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid, enabled: newValue }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to update currentlyInCouple");
+      }
+
       setCurrentlyInCouple(newValue);
       setUserData((prev) => ({ ...prev, currentlyInCouple: newValue }));
     } catch (error) {
@@ -252,8 +327,35 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   useEffect(() => {
     if (uid) {
       fetchUserData(uid);
+      loadAdminNotes(uid);
     }
   }, [uid]);
+
+  // Autosave admin notes (no separate save button).
+  useEffect(() => {
+    if (!uid) return;
+    if (isLoadingAdminNotes) return;
+
+    const current = String(adminNotes || "");
+    const lastSaved = String(lastSavedAdminNotesRef.current || "");
+    if (current === lastSaved) return;
+
+    if (notesSaveTimeoutRef.current) {
+      clearTimeout(notesSaveTimeoutRef.current);
+      notesSaveTimeoutRef.current = null;
+    }
+
+    notesSaveTimeoutRef.current = setTimeout(() => {
+      saveAdminNotes(current);
+    }, 1200);
+
+    return () => {
+      if (notesSaveTimeoutRef.current) {
+        clearTimeout(notesSaveTimeoutRef.current);
+        notesSaveTimeoutRef.current = null;
+      }
+    };
+  }, [adminNotes, uid, isLoadingAdminNotes]);
 
   // Dacă încă se încarcă datele, afișăm un mesaj de încărcare
   if (loading) {
@@ -304,6 +406,52 @@ export default function EditProfile({ activeTab, translatedTexts }) {
 
       <div className="border-top-light pt-30 mt-30">
         <form className="contact-form row y-gap-30">
+          <div className="col-12">
+            <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
+              {translatedTexts?.adminNotesLabelText || "Notes (admin uniquement)"}
+            </label>
+            <textarea
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+              placeholder={
+                translatedTexts?.adminNotesPlaceholderText ||
+                "Notes internes (non visibles par le client)…"
+              }
+              rows={6}
+              className="form-control"
+              style={{ resize: "vertical", borderRadius: 8 }}
+            />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginTop: 12,
+              }}
+            >
+              {isLoadingAdminNotes ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <DotLoader color="#c13365" size={20} />
+                  <span style={{ fontWeight: "bold" }}>
+                    {translatedTexts?.adminNotesLoadingText || "Chargement..."}
+                  </span>
+                </div>
+              ) : null}
+              {!isLoadingAdminNotes ? (
+                <span style={{ fontWeight: "bold" }}>
+                  {adminNotesSaveError
+                    ? translatedTexts?.adminNotesStatusErrorText ||
+                      "Erreur d'enregistrement"
+                    : isSavingAdminNotes
+                    ? translatedTexts?.adminNotesStatusSavingText ||
+                      "Enregistrement..."
+                    : translatedTexts?.adminNotesStatusSavedText ||
+                      "Sauvegardé"}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
           <div className="col-md-6">
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
               {translatedTexts.userNameText}
@@ -780,30 +928,26 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             </button>
           </div>
 
-          {(userData?.lifetimeAccess === true ||
-            userData?.subscriptionStatus === "lifetime") && (
-            <div
-              className="col-12 mt-20"
-              style={{ display: "flex", alignItems: "center" }}
-            >
-              <input
-                type="checkbox"
-                checked={currentlyInCouple}
-                onChange={toggleCurrentlyInCouple}
-                className="large-checkbox"
-                style={{
-                  width: "22px",
-                  height: "22px",
-                  marginRight: "10px",
-                  cursor: "pointer",
-                }}
-              />
-              <span style={{ fontSize: "16px", fontWeight: "bold" }}>
-                {translatedTexts.currentlyInCoupleText ||
-                  "În prezent în cuplu"}
-              </span>
-            </div>
-          )}
+          <div
+            className="col-12 mt-20"
+            style={{ display: "flex", alignItems: "center" }}
+          >
+            <input
+              type="checkbox"
+              checked={currentlyInCouple}
+              onChange={toggleCurrentlyInCouple}
+              className="large-checkbox"
+              style={{
+                width: "22px",
+                height: "22px",
+                marginRight: "10px",
+                cursor: "pointer",
+              }}
+            />
+            <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+              {translatedTexts.currentlyInCoupleText || "În prezent în cuplu"}
+            </span>
+          </div>
         </form>
       </div>
       {showConfirmDialog && (
