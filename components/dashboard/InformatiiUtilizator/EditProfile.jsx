@@ -6,7 +6,7 @@ import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul con
 import AlertBox from "@/components/uiElements/AlertBox";
 import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument ";
+import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 

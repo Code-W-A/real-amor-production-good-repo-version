@@ -6,7 +6,7 @@ import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul con
 import AlertBox from "@/components/uiElements/AlertBox";
 import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
-import { QuizResultsDocument } from "./QuizResultsDocument ";
+import { QuizResultsDocument } from "./QuizResultsDocument";
 
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
