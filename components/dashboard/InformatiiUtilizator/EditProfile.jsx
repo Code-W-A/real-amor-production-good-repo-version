@@ -341,6 +341,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       return {
         username: userData?.username || "",
         gender: userData?.gender || "",
+        purpose: userData?.purpose || "",
         age:
           userData?.age === null || typeof userData?.age === "undefined"
             ? ""
@@ -542,16 +543,33 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
               {translatedTexts.genText}
             </label>
-            <input
-              readOnly={!isEditMode}
-              required
-              type="text"
-              placeholder="Nume Utilizator"
-              value={isEditMode ? editUserDraft?.gender || "" : userData?.gender || ""}
-              onChange={(e) =>
-                setEditUserDraft((p) => ({ ...(p || {}), gender: e.target.value }))
-              }
-            />
+            {isEditMode ? (
+              <select
+                name="gender"
+                value={editUserDraft?.gender || ""}
+                onChange={(e) =>
+                  setEditUserDraft((p) => ({ ...(p || {}), gender: e.target.value }))
+                }
+                className="form-control"
+              >
+                <option value="">{translatedTexts.selecteazaText}</option>
+                <option value="male">{translatedTexts.hommeText}</option>
+                <option value="female">{translatedTexts.femmeText}</option>
+              </select>
+            ) : (
+              <input
+                readOnly
+                required
+                type="text"
+                value={
+                  userData?.gender === "male"
+                    ? translatedTexts.hommeText
+                    : userData?.gender === "female"
+                    ? translatedTexts.femmeText
+                    : userData?.gender || ""
+                }
+              />
+            )}
           </div>
           <div className="col-md-6">
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">Age</label>
@@ -602,21 +620,36 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
               {translatedTexts.scopText}
             </label>
-            <input
-              readOnly
-              required
-              type="text"
-              placeholder="Nume Utilizator"
-              value={
-                userData?.purpose === "love"
-                  ? translatedTexts.amourText
-                  : userData?.purpose === "casual"
-                  ? translatedTexts.sexText
-                  : userData?.purpose === "friendship"
-                  ? translatedTexts.amitieText
-                  : ""
-              }
-            />
+            {isEditMode ? (
+              <select
+                name="purpose"
+                value={editUserDraft?.purpose || ""}
+                onChange={(e) =>
+                  setEditUserDraft((p) => ({ ...(p || {}), purpose: e.target.value }))
+                }
+                className="form-control"
+              >
+                <option value="">{translatedTexts.selecteazaText}</option>
+                <option value="love">{translatedTexts.amourText}</option>
+                <option value="casual">{translatedTexts.sexText}</option>
+                <option value="friendship">{translatedTexts.amitieText}</option>
+              </select>
+            ) : (
+              <input
+                readOnly
+                required
+                type="text"
+                value={
+                  userData?.purpose === "love"
+                    ? translatedTexts.amourText
+                    : userData?.purpose === "casual"
+                    ? translatedTexts.sexText
+                    : userData?.purpose === "friendship"
+                    ? translatedTexts.amitieText
+                    : ""
+                }
+              />
+            )}
           </div>
 
           <div className="col-12">

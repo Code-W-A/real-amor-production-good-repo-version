@@ -482,12 +482,12 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                 </>
               ) : (
                 <>
-                  <p>
-                    {translatedTexts.noSubscriptionText}{" "}
-                    <Link className="buy-sub" href="/subscriptions">
-                      {translatedTexts.buySubscriptionText}
-                    </Link>
-                  </p>
+                <p>
+                  {translatedTexts.noSubscriptionText}{" "}
+                  <Link className="buy-sub" href="/subscriptions">
+                    {translatedTexts.buySubscriptionText}
+                  </Link>
+                </p>
                   <LifetimeOfferCard />
                 </>
               )

@@ -615,35 +615,35 @@ export default function Subscriptions({
 
           {/* Card 4 - Lifetime (only shown when enabled) */}
           {lifetimePromoEnabled && (
-            <div>
-              <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
-                <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
-                  <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
+          <div>
+            <div className="priceCard -type-1 rounded-16 bg-white shadow-2">
+              <div className="priceCard__content py-45 px-60 xl:px-40 text-center">
+                <div className="priceCard__type text-18 lh-11 fw-500 text-dark-1">
                     {translatedLinks.abonamentLifetime || "Abonnement à vie"}
-                  </div>
-                  <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
+                </div>
+                <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
                     {translatedLinks.lifetimeDurationText || "à vie"}
                   </div>
 
                   {/* Client request: no promo badge on this card */}
 
-                  <div className="text-left y-gap-15 mt-35">
-                    <div>
-                      <i className="text-purple-1 fa fa-check pr-8"></i>
-                      {translatedLinks.oneTimeFeature1}
-                    </div>
-                    <div>
-                      <i className="text-purple-1 fa fa-check pr-8"></i>
-                      {translatedLinks.oneTimeFeature2}
-                    </div>
-                    <div>
-                      <i className="text-purple-1 fa fa-check pr-8"></i>
-                      {translatedLinks.oneTimeFeature3}
-                    </div>
-                    <div>
-                      <i className="text-purple-1 fa fa-check pr-8"></i>
-                      {translatedLinks.oneTimeFeature4}
-                    </div>
+                <div className="text-left y-gap-15 mt-35">
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature1}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature2}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature3}
+                  </div>
+                  <div>
+                    <i className="text-purple-1 fa fa-check pr-8"></i>
+                    {translatedLinks.oneTimeFeature4}
+                  </div>
                     {/* Client request: copy the 89€ features list */}
                     <div>
                       <i className="text-purple-1 fa fa-check pr-8"></i>
@@ -661,47 +661,47 @@ export default function Subscriptions({
                       <i className="text-purple-1 fa fa-check pr-8"></i>
                       {translatedLinks.oneTimeFeature8}
                     </div>
-                  </div>
+                </div>
 
-                  <div className="terms-acceptance mt-20">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={isAccepted[3]}
-                        onChange={() => handleCheckboxChange(3)}
-                      />{" "}
-                      {acceptTermsText}
-                    </label>
-                  </div>
+                <div className="terms-acceptance mt-20">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={isAccepted[3]}
+                      onChange={() => handleCheckboxChange(3)}
+                    />{" "}
+                    {acceptTermsText}
+                  </label>
+                </div>
 
-                  <div className="d-inline-block mt-30">
-                    {!isAccepted[3] && (
-                      <button
-                        className="button px-40 py-20 fw-500 disabled-button"
-                        disabled
-                      >
-                        {getStarted}
-                      </button>
-                    )}
-                    {isAccepted[3] && (
-                      <button
-                        className="button px-40 py-20 fw-500 -purple-1"
-                        onClick={() =>
-                          initiateCheckout(
+                <div className="d-inline-block mt-30">
+                  {!isAccepted[3] && (
+                    <button
+                      className="button px-40 py-20 fw-500 disabled-button"
+                      disabled
+                    >
+                      {getStarted}
+                    </button>
+                  )}
+                  {isAccepted[3] && (
+                    <button
+                      className="button px-40 py-20 fw-500 -purple-1"
+                      onClick={() =>
+                        initiateCheckout(
                             "LIFETIME",
-                            3,
+                          3,
                             translatedLinks.abonamentLifetime || "Abonnement à vie",
                             { type: "lifetime" }
-                          )
-                        }
-                      >
-                        {getStarted}
-                      </button>
-                    )}
-                  </div>
+                        )
+                      }
+                    >
+                      {getStarted}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+          </div>
           )}
         </div>
 

@@ -13,6 +13,7 @@ function pickAllowedUpdates(input) {
   const fields = [
     "username",
     "gender",
+    "purpose",
     "age",
     "phone",
     "email",
@@ -37,6 +38,7 @@ function pickAllowedUpdates(input) {
   // Normalize / clamp
   if (typeof out.username === "string") out.username = out.username.trim().slice(0, 120);
   if (typeof out.gender === "string") out.gender = out.gender.trim().slice(0, 40);
+  if (typeof out.purpose === "string") out.purpose = out.purpose.trim().slice(0, 40);
   if (typeof out.phone === "string") out.phone = out.phone.trim().slice(0, 40);
   if (typeof out.email === "string") out.email = out.email.trim().slice(0, 200);
   if (typeof out.aboutMe === "string") out.aboutMe = out.aboutMe.slice(0, 8000);
@@ -49,6 +51,23 @@ function pickAllowedUpdates(input) {
   if (typeof out.age === "number") {
     const n = Math.max(0, Math.min(130, Math.floor(out.age)));
     out.age = n;
+  }
+
+  // Enforce enums (match signup form values) to avoid database corruption
+  if ("gender" in out) {
+    if (out.gender !== "male" && out.gender !== "female" && out.gender !== null) {
+      delete out.gender;
+    }
+  }
+  if ("purpose" in out) {
+    if (
+      out.purpose !== "love" &&
+      out.purpose !== "casual" &&
+      out.purpose !== "friendship" &&
+      out.purpose !== null
+    ) {
+      delete out.purpose;
+    }
   }
 
   return out;
