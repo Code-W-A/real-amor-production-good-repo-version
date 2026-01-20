@@ -44,6 +44,10 @@ export default async function page({ params }) {
     veziDetaliiText: await fetchTranslation("Voir détails", targetLanguage),
     genText: await fetchTranslation("Genre", targetLanguage),
     scopText: await fetchTranslation("Objectif", targetLanguage),
+    usersPerPageLabelText: await fetchTranslation(
+      "Utilisateurs par page",
+      targetLanguage
+    ),
   };
 
   return (

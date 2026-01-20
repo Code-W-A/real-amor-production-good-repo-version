@@ -12,9 +12,30 @@ export default function MyCourses({ translatedTexts }) {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(5);
+  const [usersPerPage, setUsersPerPage] = useState(5);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
+
+  // Persist "users per page" preference
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("adminUsersPerPage");
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) {
+        setUsersPerPage(n);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("adminUsersPerPage", String(usersPerPage));
+    } catch {
+      // ignore
+    }
+  }, [usersPerPage]);
 
   // useEffect(() => {
   //   const authenticated = authentication;
@@ -70,6 +91,11 @@ export default function MyCourses({ translatedTexts }) {
     setCurrentPage(1);
   }, [searchTerm, users]);
 
+  // If page size changes, reset to first page for consistent UX.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [usersPerPage]);
+
   // Calculează utilizatorii care trebuie afișați pe pagina curentă
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
@@ -98,6 +124,23 @@ export default function MyCourses({ translatedTexts }) {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
+          </div>
+          <div className="col-auto" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontWeight: "bold" }}>
+              {translatedTexts?.usersPerPageLabelText || "Utilizatori / pagină"}
+            </span>
+            <select
+              value={usersPerPage}
+              onChange={(e) => setUsersPerPage(Number(e.target.value))}
+              className="form-control"
+              style={{ minWidth: 120 }}
+            >
+              {[5, 10, 20, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
