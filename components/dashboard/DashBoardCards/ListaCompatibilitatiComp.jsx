@@ -26,10 +26,37 @@ export default function ListCompatibilitati({
   data,
   translatedTexts,
   compatibility,
+  compatibilityDetails = [],
   userUid,
 }) {
   const router = useRouter();
   const [isCompatible, setIsCompatible] = useState(false); // Starea pentru compatibilitate
+  const [showDiffDialog, setShowDiffDialog] = useState(false);
+
+  const formatAnswer = (value) => {
+    if (value === null || typeof value === "undefined") return "-";
+    if (typeof value?.toDate === "function") {
+      try {
+        return value.toDate().toLocaleString();
+      } catch {
+        return String(value);
+      }
+    }
+    if (value instanceof Date) return value.toLocaleString();
+    if (Array.isArray(value)) return value.map(formatAnswer).join(", ");
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
+  const diffQuestions = Array.isArray(compatibilityDetails)
+    ? compatibilityDetails.filter((q) => q && q.isCompatible === false)
+    : [];
 
   const handleCopyResponses = async () => {
     try {
@@ -155,6 +182,113 @@ export default function ListCompatibilitati({
       <td>{data.gender ? data.gender : "N/A"}</td>
       <td>{data.isActivated ? "Cont activ" : "Cont inactiv"}</td>
       <td>{compatibility}%</td>
+      <td>
+        <button
+          type="button"
+          className="btn custom-btn-compatibilitati"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowDiffDialog(true);
+          }}
+        >
+          {translatedTexts.compatibilityDiffButtonText || "Voir"}
+        </button>
+
+        {showDiffDialog && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              zIndex: 2000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+            }}
+            onClick={() => setShowDiffDialog(false)}
+          >
+            <div
+              style={{
+                backgroundColor: "white",
+                borderRadius: 12,
+                width: "min(900px, 95vw)",
+                maxHeight: "85vh",
+                overflow: "auto",
+                padding: 20,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <h3 style={{ margin: 0 }}>
+                  {translatedTexts.compatibilityDetailsHeaderText ||
+                    "Réponses non compatibles"}
+                </h3>
+                <button
+                  type="button"
+                  className="button -sm -gray-1 text-dark-1"
+                  onClick={() => setShowDiffDialog(false)}
+                >
+                  {translatedTexts.closeText || "Fermer"}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                {diffQuestions.length === 0 ? (
+                  <p style={{ margin: 0 }}>
+                    {translatedTexts.compatibilityNoDiffText ||
+                      "Aucune différence détectée."}
+                  </p>
+                ) : (
+                  <table className="table table-striped" style={{ marginTop: 10 }}>
+                    <thead>
+                      <tr>
+                        <th>
+                          {translatedTexts.compatibilityQuestionText ||
+                            "Question"}
+                        </th>
+                        <th>
+                          {translatedTexts.compatibilityYourAnswerText ||
+                            "Réponse (utilisateur)"}
+                        </th>
+                        <th>
+                          {translatedTexts.compatibilityOtherAnswerText ||
+                            "Réponse (compatible)"}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diffQuestions.map((q) => (
+                        <tr key={`${q.questionId}-${q.questionText}`}>
+                          <td style={{ width: "45%" }}>
+                            {q.questionText || "-"}
+                          </td>
+                          <td style={{ width: "27.5%" }}>
+                            {formatAnswer(q.currentUserAnswer)}
+                          </td>
+                          <td style={{ width: "27.5%" }}>
+                            {formatAnswer(q.comparedUserAnswer)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </td>
       <td style={{ display: "flex", gap: "10px" }}>
         <button
           onClick={(e) => {

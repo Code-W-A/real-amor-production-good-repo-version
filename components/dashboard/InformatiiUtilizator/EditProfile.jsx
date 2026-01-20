@@ -38,6 +38,9 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
   const [showCancelSubscriptionDialog, setShowCancelSubscriptionDialog] =
     useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [editUserDraft, setEditUserDraft] = useState(null);
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -51,7 +54,6 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false);
   const [adminNotesSaveError, setAdminNotesSaveError] = useState("");
   const lastSavedAdminNotesRef = useRef("");
-  const notesSaveTimeoutRef = useRef(null);
 
   const router = useRouter();
 
@@ -331,31 +333,68 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   }, [uid]);
 
-  // Autosave admin notes (no separate save button).
+  // Keep an editable draft in sync with loaded user data (until admin starts editing).
   useEffect(() => {
+    if (!userData) return;
+    setEditUserDraft((prev) => {
+      if (prev && isEditMode) return prev;
+      return {
+        username: userData?.username || "",
+        gender: userData?.gender || "",
+        age:
+          userData?.age === null || typeof userData?.age === "undefined"
+            ? ""
+            : String(userData.age),
+        phone: userData?.phone || "",
+        email: userData?.email || "",
+        aboutMe: userData?.aboutMe || "",
+        address: userData?.address || "",
+      };
+    });
+  }, [userData, isEditMode]);
+
+  const saveUserEdits = async () => {
     if (!uid) return;
-    if (isLoadingAdminNotes) return;
+    if (!editUserDraft) return;
+    try {
+      setIsSavingUser(true);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
 
-    const current = String(adminNotes || "");
-    const lastSaved = String(lastSavedAdminNotesRef.current || "");
-    if (current === lastSaved) return;
-
-    if (notesSaveTimeoutRef.current) {
-      clearTimeout(notesSaveTimeoutRef.current);
-      notesSaveTimeoutRef.current = null;
-    }
-
-    notesSaveTimeoutRef.current = setTimeout(() => {
-      saveAdminNotes(current);
-    }, 1200);
-
-    return () => {
-      if (notesSaveTimeoutRef.current) {
-        clearTimeout(notesSaveTimeoutRef.current);
-        notesSaveTimeoutRef.current = null;
+      const res = await fetch("/api/admin-update-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid, updates: editUserDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to save user");
       }
-    };
-  }, [adminNotes, uid, isLoadingAdminNotes]);
+
+      await fetchUserData(uid);
+      setIsEditMode(false);
+      setAlertMessage({
+        type: "success",
+        content:
+          translatedTexts?.adminUserSavedText ||
+          "Modifications enregistrées.",
+        showAlert: true,
+      });
+    } catch (e) {
+      setAlertMessage({
+        type: "danger",
+        content: `Erreur: ${e.message}`,
+        showAlert: true,
+      });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  // Notes are saved explicitly via button (no autosave).
 
   // Dacă încă se încarcă datele, afișăm un mesaj de încărcare
   if (loading) {
@@ -377,6 +416,33 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           {/* <div className="mt-10">
               Lorem ipsum dolor sit amet, consectetur.
             </div> */}
+        </div>
+      </div>
+
+      <div className="row mb-20">
+        <div className="col-12" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className={`button -md ${isEditMode ? "-gray-1 text-dark-1" : "-purple-1 text-white"}`}
+            onClick={() => setIsEditMode((v) => !v)}
+            disabled={isSavingUser}
+          >
+            {isEditMode
+              ? translatedTexts?.adminEditCancelText || "Annuler l'édition"
+              : translatedTexts?.adminEditEnableText || "Modifier"}
+          </button>
+          {isEditMode ? (
+            <button
+              type="button"
+              className="button -md -green-1 text-white"
+              onClick={saveUserEdits}
+              disabled={isSavingUser || !editUserDraft}
+            >
+              {isSavingUser
+                ? translatedTexts?.adminSavingUserText || "Enregistrement..."
+                : translatedTexts?.adminSaveUserText || "Enregistrer"}
+            </button>
+          ) : null}
         </div>
       </div>
       <div className="row y-gap-20 x-gap-20 items-center">
@@ -437,16 +503,20 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   </span>
                 </div>
               ) : null}
-              {!isLoadingAdminNotes ? (
-                <span style={{ fontWeight: "bold" }}>
-                  {adminNotesSaveError
-                    ? translatedTexts?.adminNotesStatusErrorText ||
-                      "Erreur d'enregistrement"
-                    : isSavingAdminNotes
-                    ? translatedTexts?.adminNotesStatusSavingText ||
-                      "Enregistrement..."
-                    : translatedTexts?.adminNotesStatusSavedText ||
-                      "Sauvegardé"}
+              <button
+                type="button"
+                className="button -md -purple-1 text-white"
+                onClick={() => saveAdminNotes(adminNotes)}
+                disabled={isSavingAdminNotes || isLoadingAdminNotes}
+              >
+                {isSavingAdminNotes
+                  ? translatedTexts?.adminNotesSavingText || "Enregistrement..."
+                  : translatedTexts?.adminNotesSaveText || "Enregistrer"}
+              </button>
+              {adminNotesSaveError ? (
+                <span style={{ fontWeight: "bold", color: "red" }}>
+                  {translatedTexts?.adminNotesStatusErrorText ||
+                    "Erreur d'enregistrement"}
                 </span>
               ) : null}
             </div>
@@ -457,11 +527,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.userNameText}
             </label>
             <input
-              readOnly
+              readOnly={!isEditMode}
               required
               type="text"
               placeholder="Nume Utilizator"
-              value={userData?.username || ""}
+              value={isEditMode ? editUserDraft?.username || "" : userData?.username || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), username: e.target.value }))
+              }
             />
           </div>
 
@@ -470,21 +543,27 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.genText}
             </label>
             <input
-              readOnly
+              readOnly={!isEditMode}
               required
               type="text"
               placeholder="Nume Utilizator"
-              value={userData?.gender || ""}
+              value={isEditMode ? editUserDraft?.gender || "" : userData?.gender || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), gender: e.target.value }))
+              }
             />
           </div>
           <div className="col-md-6">
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">Age</label>
             <input
-              readOnly
+              readOnly={!isEditMode}
               required
               type="text"
               placeholder="Nume Utilizator"
-              value={userData?.age || ""}
+              value={isEditMode ? editUserDraft?.age ?? "" : userData?.age || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), age: e.target.value }))
+              }
             />
           </div>
 
@@ -493,11 +572,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.phoneNumberText}
             </label>
             <input
-              readOnly
+              readOnly={!isEditMode}
               required
               type="text"
               placeholder="Telefon"
-              value={userData?.phone || ""}
+              value={isEditMode ? editUserDraft?.phone || "" : userData?.phone || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), phone: e.target.value }))
+              }
             />
           </div>
 
@@ -506,11 +588,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.emailText}
             </label>
             <input
-              readOnly
+              readOnly={!isEditMode}
               required
               type="text"
               placeholder="Email"
-              value={userData?.email || ""}
+              value={isEditMode ? editUserDraft?.email || "" : userData?.email || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), email: e.target.value }))
+              }
             />
           </div>
           <div className="col-md-12">
@@ -539,11 +624,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.aboutMeText}
             </label>
             <textarea
-              readOnly
+              readOnly={!isEditMode}
               required
               placeholder="Despre mine"
               rows="7"
-              value={userData?.aboutMe || ""}
+              value={isEditMode ? editUserDraft?.aboutMe || "" : userData?.aboutMe || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), aboutMe: e.target.value }))
+              }
             ></textarea>
           </div>
           <div className="col-12">
@@ -551,11 +639,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               {translatedTexts.AddressText}
             </label>
             <textarea
-              readOnly
+              readOnly={!isEditMode}
               required
               placeholder="Despre mine"
               rows="7"
-              value={userData?.address || ""}
+              value={isEditMode ? editUserDraft?.address || "" : userData?.address || ""}
+              onChange={(e) =>
+                setEditUserDraft((p) => ({ ...(p || {}), address: e.target.value }))
+              }
             ></textarea>
           </div>
 

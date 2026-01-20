@@ -175,6 +175,49 @@ export default function Settings({ translatedTexts }) {
 
     const skipAnswer = "Je préfère ne pas répondre à la question";
 
+    // Normalize answers so "same meaning" matches even if serialized differently
+    // (e.g., multi-select arrays chosen in different order).
+    const normalizeAnswer = (value) => {
+      if (value === null || typeof value === "undefined") return null;
+      // Firestore can store timestamps / dates as objects in some flows
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      if (typeof value?.toDate === "function") {
+        try {
+          return value.toDate().toISOString();
+        } catch {
+          return String(value);
+        }
+      }
+      if (Array.isArray(value)) {
+        // Sort elements to make order irrelevant
+        const norm = value
+          .map((v) => normalizeAnswer(v))
+          .filter((v) => v !== null);
+        return norm.sort((a, b) => String(a).localeCompare(String(b)));
+      }
+      if (typeof value === "object") {
+        // Stable key order
+        const keys = Object.keys(value).sort();
+        const out = {};
+        for (const k of keys) {
+          out[k] = normalizeAnswer(value[k]);
+        }
+        return out;
+      }
+      if (typeof value === "string") {
+        return value.trim();
+      }
+      return value;
+    };
+
+    const answersEqual = (a, b) => {
+      const na = normalizeAnswer(a);
+      const nb = normalizeAnswer(b);
+      return JSON.stringify(na) === JSON.stringify(nb);
+    };
+
     // Funcție actualizată pentru a căuta întrebările folosind expresii regulate
     const getAnswerByText = (responses, regex) => {
       for (const set of questionSets) {
@@ -253,8 +296,7 @@ export default function Settings({ translatedTexts }) {
             const isCompatible =
               currentQuestion.answer &&
               matchedQuestion.answer &&
-              JSON.stringify(currentQuestion.answer) ===
-                JSON.stringify(matchedQuestion.answer);
+              answersEqual(currentQuestion.answer, matchedQuestion.answer);
 
             commonQuestions.push({
               questionId: currentQuestion.id,
@@ -350,6 +392,10 @@ export default function Settings({ translatedTexts }) {
                             <th>{translatedTexts.genText}</th>
                             <th>Statut</th>
                             <th>Compatibilité</th>
+                            <th>
+                              {translatedTexts.compatibilityDetailsColText ||
+                                "Détails"}
+                            </th>
                             <th>Actions</th>
                           </tr>
                         </thead>
@@ -361,6 +407,7 @@ export default function Settings({ translatedTexts }) {
                               compatibility={
                                 user?.compatibility?.compatibilityScore
                               }
+                              compatibilityDetails={user?.compatibility?.questions || []}
                               translatedTexts={translatedTexts}
                               userUid={uid}
                             />

@@ -128,11 +128,36 @@ export default function Settings({ translatedTexts }) {
           currentQuestion.compatibility &&
           matchedQuestion.compatibility
         ) {
-          const isCompatible =
-            currentQuestion.answer &&
-            matchedQuestion.answer &&
-            JSON.stringify(currentQuestion.answer) ===
-              JSON.stringify(matchedQuestion.answer);
+            const normalizeAnswer = (value) => {
+              if (value === null || typeof value === "undefined") return null;
+              if (value instanceof Date) return value.toISOString();
+              if (typeof value?.toDate === "function") {
+                try {
+                  return value.toDate().toISOString();
+                } catch {
+                  return String(value);
+                }
+              }
+              if (Array.isArray(value)) {
+                const norm = value
+                  .map((v) => normalizeAnswer(v))
+                  .filter((v) => v !== null);
+                return norm.sort((a, b) => String(a).localeCompare(String(b)));
+              }
+              if (typeof value === "object") {
+                const keys = Object.keys(value).sort();
+                const out = {};
+                for (const k of keys) out[k] = normalizeAnswer(value[k]);
+                return out;
+              }
+              if (typeof value === "string") return value.trim();
+              return value;
+            };
+            const isCompatible =
+              currentQuestion.answer &&
+              matchedQuestion.answer &&
+              JSON.stringify(normalizeAnswer(currentQuestion.answer)) ===
+                JSON.stringify(normalizeAnswer(matchedQuestion.answer));
 
           commonQuestions.push({
             questionId: currentQuestion.id,

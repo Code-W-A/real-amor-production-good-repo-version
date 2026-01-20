@@ -190,6 +190,29 @@ export default async function page({ params }) {
       "Actuellement en couple",
       targetLanguage
     ),
+    compatibilityDetailsColText: await fetchTranslation("Détails", targetLanguage),
+    compatibilityDiffButtonText: await fetchTranslation(
+      "Voir",
+      targetLanguage
+    ),
+    compatibilityDetailsHeaderText: await fetchTranslation(
+      "Réponses non compatibles",
+      targetLanguage
+    ),
+    compatibilityNoDiffText: await fetchTranslation(
+      "Aucune différence détectée.",
+      targetLanguage
+    ),
+    compatibilityQuestionText: await fetchTranslation("Question", targetLanguage),
+    compatibilityYourAnswerText: await fetchTranslation(
+      "Réponse (utilisateur)",
+      targetLanguage
+    ),
+    compatibilityOtherAnswerText: await fetchTranslation(
+      "Réponse (compatible)",
+      targetLanguage
+    ),
+    closeText: await fetchTranslation("Fermer", targetLanguage),
     adminNotesLabelText: await fetchTranslation(
       "Notes (admin uniquement)",
       targetLanguage
@@ -205,6 +228,11 @@ export default async function page({ params }) {
     adminNotesStatusSavingText: await fetchTranslation("Enregistrement...", targetLanguage),
     adminNotesStatusSavedText: await fetchTranslation("Sauvegardé", targetLanguage),
     adminNotesStatusErrorText: await fetchTranslation("Erreur d'enregistrement", targetLanguage),
+    adminEditEnableText: await fetchTranslation("Modifier", targetLanguage),
+    adminEditCancelText: await fetchTranslation("Annuler l'édition", targetLanguage),
+    adminSaveUserText: await fetchTranslation("Enregistrer", targetLanguage),
+    adminSavingUserText: await fetchTranslation("Enregistrement...", targetLanguage),
+    adminUserSavedText: await fetchTranslation("Modifications enregistrées.", targetLanguage),
   };
 
   return (
