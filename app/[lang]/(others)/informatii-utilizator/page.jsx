@@ -213,6 +213,19 @@ export default async function page({ params }) {
       targetLanguage
     ),
     closeText: await fetchTranslation("Fermer", targetLanguage),
+    compatibilityDebugCopyTitleText: await fetchTranslation(
+      "Debug compatibilité",
+      targetLanguage
+    ),
+    compatibilityDebugCopyHintText: await fetchTranslation(
+      "Copiez le JSON des réponses non compatibles pour analyse.",
+      targetLanguage
+    ),
+    compatibilityDebugCopyButtonText: await fetchTranslation(
+      "Copier",
+      targetLanguage
+    ),
+    compatibilityDebugCopiedText: await fetchTranslation("Copié", targetLanguage),
     adminNotesLabelText: await fetchTranslation(
       "Notes (admin uniquement)",
       targetLanguage

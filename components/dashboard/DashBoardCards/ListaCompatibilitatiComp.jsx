@@ -32,6 +32,8 @@ export default function ListCompatibilitati({
   const router = useRouter();
   const [isCompatible, setIsCompatible] = useState(false); // Starea pentru compatibilitate
   const [showDiffDialog, setShowDiffDialog] = useState(false);
+  const [copiedDebug, setCopiedDebug] = useState(false);
+  const debugCompatEnabled = process.env.NEXT_PUBLIC_DEBUG_COMPAT === "true";
 
   const formatAnswer = (value) => {
     if (value === null || typeof value === "undefined") return "-";
@@ -57,6 +59,32 @@ export default function ListCompatibilitati({
   const diffQuestions = Array.isArray(compatibilityDetails)
     ? compatibilityDetails.filter((q) => q && q.isCompatible === false)
     : [];
+
+  const buildDebugPayload = () => ({
+    generatedAt: new Date().toISOString(),
+    currentUserId: userUid,
+    compatibleUserId: data?.id || null,
+    compatibleUsername: data?.username || null,
+    compatibilityPercent: compatibility,
+    diffs: diffQuestions.map((q) => ({
+      set: q?.set || null,
+      questionId: q?.questionId ?? null,
+      questionText: q?.questionText ?? null,
+      currentUserAnswer: q?.currentUserAnswer ?? null,
+      comparedUserAnswer: q?.comparedUserAnswer ?? null,
+    })),
+  });
+
+  const copyDebugPayload = async () => {
+    try {
+      const payload = buildDebugPayload();
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setCopiedDebug(true);
+      setTimeout(() => setCopiedDebug(false), 2500);
+    } catch (e) {
+      console.error("Failed to copy debug payload:", e);
+    }
+  };
 
   const handleCopyResponses = async () => {
     try {
@@ -244,6 +272,41 @@ export default function ListCompatibilitati({
               </div>
 
               <div style={{ marginTop: 12 }}>
+                {debugCompatEnabled && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      marginBottom: 12,
+                      padding: 12,
+                      borderRadius: 10,
+                      background: "#f7f7ff",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: "bold" }}>
+                        {translatedTexts.compatibilityDebugCopyTitleText ||
+                          "Debug compatibilité"}
+                      </div>
+                      <div style={{ fontSize: 13, opacity: 0.8 }}>
+                        {translatedTexts.compatibilityDebugCopyHintText ||
+                          "Copiez le JSON des réponses non compatibles pour analyse."}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="button -sm -purple-1 text-white"
+                      onClick={copyDebugPayload}
+                    >
+                      {copiedDebug
+                        ? translatedTexts.compatibilityDebugCopiedText || "Copié"
+                        : translatedTexts.compatibilityDebugCopyButtonText ||
+                          "Copier"}
+                    </button>
+                  </div>
+                )}
                 {diffQuestions.length === 0 ? (
                   <p style={{ margin: 0 }}>
                     {translatedTexts.compatibilityNoDiffText ||

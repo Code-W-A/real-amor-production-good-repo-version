@@ -15,19 +15,15 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { authentication } from "@/firebase";
 import { DotLoader } from "react-spinners";
+import { isAdminUid } from "@/utils/adminUids";
 
 export default function DashboardOne() {
   const { userData, currentUser, loading } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(true);
   const router = useRouter();
   useEffect(() => {
-    const adminUids = new Set([
-      "SJTAqVztndgxISJAtnGzaSKieV02",
-      "feSm5lY3F7aFrWNWneYw8qbPkiT2",
-      "AcjykpO4W4M5JWCFPg0ZuxZVmiz1"
-    ]);
     const uid = currentUser?.uid || currentUser?.user?.uid;
-    if (!loading && !adminUids.has(uid)) {
+    if (!loading && !isAdminUid(uid)) {
       router.push("/login-admin");
     } else {
       router.push("/lista-utilizatori");

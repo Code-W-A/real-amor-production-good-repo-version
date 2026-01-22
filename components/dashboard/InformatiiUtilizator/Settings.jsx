@@ -218,6 +218,46 @@ export default function Settings({ translatedTexts }) {
       return JSON.stringify(na) === JSON.stringify(nb);
     };
 
+    // Helpers for type-aware matching (so "opposite" answers can still be compatible)
+    const parseDDMMYYYY = (str) => {
+      if (typeof str !== "string") return null;
+      const m = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return null;
+      const day = Number(m[1]);
+      const month = Number(m[2]);
+      const year = Number(m[3]);
+      if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year))
+        return null;
+      const d = new Date(year, month - 1, day);
+      if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day)
+        return null;
+      return d;
+    };
+
+    const computeAgeFromDate = (birthDate) => {
+      if (!(birthDate instanceof Date)) return null;
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const md = today.getMonth() - birthDate.getMonth();
+      if (md < 0 || (md === 0 && today.getDate() < birthDate.getDate())) age--;
+      return Number.isFinite(age) && age >= 0 && age <= 130 ? age : null;
+    };
+
+    const inRange = (value, range) => {
+      if (!Number.isFinite(Number(value))) return false;
+      const v = Number(value);
+      const min = Number(range?.min);
+      const max = Number(range?.max);
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+      return v >= Math.min(min, max) && v <= Math.max(min, max);
+    };
+
+    const includesIgnore = (arrOrStr, needle) => {
+      if (Array.isArray(arrOrStr)) return arrOrStr.includes(needle);
+      if (typeof arrOrStr === "string") return arrOrStr.includes(needle);
+      return false;
+    };
+
     // Funcție actualizată pentru a căuta întrebările folosind expresii regulate
     const getAnswerByText = (responses, regex) => {
       for (const set of questionSets) {
@@ -293,12 +333,98 @@ export default function Settings({ translatedTexts }) {
             currentQuestion.answer !== skipAnswer &&
             matchedQuestion.answer !== skipAnswer
           ) {
-            const isCompatible =
+            let isCompatible =
               currentQuestion.answer &&
               matchedQuestion.answer &&
               answersEqual(currentQuestion.answer, matchedQuestion.answer);
 
+            // Special-case some questions: for compatibility, values are expected to differ.
+            const qText = String(currentQuestion?.text || "").toLowerCase();
+            const a = currentQuestion?.answer;
+            const b = matchedQuestion?.answer;
+
+            // Gender + seeking questions: already gated by genderCompatibility, so consider them compatible
+            if (qText.includes("etes-vous") || qText.includes("cherchez-vous")) {
+              isCompatible = true;
+            }
+
+            // Religion preference: treat "Sans importance" as a wildcard (compatible)
+            if (qText.includes("préférence") && qText.includes("religion")) {
+              const wildcard = "Sans importance";
+              if (includesIgnore(a, wildcard) || includesIgnore(b, wildcard)) {
+                isCompatible = true;
+              }
+            }
+
+            // DOB vs partner age range: compatibility is range-based, not equality.
+            if (qText.includes("date de naissance")) {
+              const dob = typeof a === "string" ? parseDDMMYYYY(a) : null;
+              const age = computeAgeFromDate(dob);
+              // Find other user's preferred age range question
+              const otherAgeRange = userSet.find((q) =>
+                /tranche d’âge idéale/i.test(String(q?.text || ""))
+              )?.answer;
+              if (age !== null && otherAgeRange && typeof otherAgeRange === "object") {
+                isCompatible = inRange(age, otherAgeRange);
+              }
+            }
+            if (qText.includes("tranche d’âge idéale")) {
+              const otherDob = typeof b === "string" ? parseDDMMYYYY(b) : null;
+              const otherAge = computeAgeFromDate(otherDob);
+              // Find current user's DOB question
+              const currentDob = currentSet.find((q) =>
+                /date de naissance/i.test(String(q?.text || ""))
+              )?.answer;
+              const currentAge =
+                typeof currentDob === "string"
+                  ? computeAgeFromDate(parseDDMMYYYY(currentDob))
+                  : null;
+              // Here a is the range, compare the other user's age into current range
+              if (otherAge !== null && a && typeof a === "object") {
+                isCompatible = inRange(otherAge, a);
+              } else if (currentAge !== null && b && typeof b === "object") {
+                // fallback (shouldn't happen): compare current age into other range
+                isCompatible = inRange(currentAge, b);
+              }
+            }
+
+            // Height/weight + preferred ranges
+            if (qText.includes("votre taille")) {
+              const otherRange = userSet.find((q) =>
+                /taille minimum et maximum/i.test(String(q?.text || ""))
+              )?.answer;
+              if (typeof a === "number" && otherRange && typeof otherRange === "object") {
+                isCompatible = inRange(a, otherRange);
+              }
+            }
+            if (qText.includes("taille minimum et maximum")) {
+              const otherHeight = userSet.find((q) =>
+                /votre taille/i.test(String(q?.text || ""))
+              )?.answer;
+              if (typeof otherHeight === "number" && a && typeof a === "object") {
+                isCompatible = inRange(otherHeight, a);
+              }
+            }
+
+            if (qText.includes("votre poids")) {
+              const otherRange = userSet.find((q) =>
+                /poids minimum et maximum/i.test(String(q?.text || ""))
+              )?.answer;
+              if (typeof a === "number" && otherRange && typeof otherRange === "object") {
+                isCompatible = inRange(a, otherRange);
+              }
+            }
+            if (qText.includes("poids minimum et maximum")) {
+              const otherWeight = userSet.find((q) =>
+                /votre poids/i.test(String(q?.text || ""))
+              )?.answer;
+              if (typeof otherWeight === "number" && a && typeof a === "object") {
+                isCompatible = inRange(otherWeight, a);
+              }
+            }
+
             commonQuestions.push({
+              set,
               questionId: currentQuestion.id,
               questionText: currentQuestion.text,
               currentUserAnswer: currentQuestion.answer,
