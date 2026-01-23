@@ -9,6 +9,7 @@ import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
+import { questionsSet1, questionsSet2, questionsSet3 } from "@/data/quiz";
 
 function formatFirestoreDate(value) {
   if (!value) return null;
@@ -407,6 +408,50 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     return <p>No user data found.</p>;
   }
 
+  const personalityCategoryStats = (() => {
+    try {
+      const allQuestions = [
+        ...(Array.isArray(questionsSet1) ? questionsSet1 : []),
+        ...(Array.isArray(questionsSet2) ? questionsSet2 : []),
+        ...(Array.isArray(questionsSet3) ? questionsSet3 : []),
+      ];
+      const idToCategory = new Map();
+      for (const q of allQuestions) {
+        if (q?.personalitate && q?.categoriePersonalitate && typeof q.id === "number") {
+          idToCategory.set(q.id, String(q.categoriePersonalitate));
+        }
+      }
+
+      // Initialize categories A..G
+      const letters = ["A", "B", "C", "D", "E", "F", "G"];
+      const stats = {};
+      for (const l of letters) stats[l] = { yes: 0, total: 0 };
+
+      const responsesBySet = userData?.responses || {};
+      const sets = Object.keys(responsesBySet);
+      for (const setName of sets) {
+        const arr = Array.isArray(responsesBySet[setName]) ? responsesBySet[setName] : [];
+        for (const r of arr) {
+          const id = r?.id;
+          if (typeof id !== "number") continue;
+          const cat = idToCategory.get(id);
+          if (!cat) continue;
+          const m = cat.match(/CATEGORIA\s+([A-G])/i);
+          const letter = m?.[1]?.toUpperCase() || null;
+          if (!letter || !stats[letter]) continue;
+          if (typeof r?.answer === "undefined" || r?.answer === null) continue;
+          stats[letter].total += 1;
+          if (String(r.answer).toLowerCase() === "oui") stats[letter].yes += 1;
+        }
+      }
+
+      const hasAny = letters.some((l) => stats[l].total > 0);
+      return { hasAny, stats, letters };
+    } catch {
+      return { hasAny: false, stats: {}, letters: [] };
+    }
+  })();
+
   return (
     <div
       className={`tabs__pane -tab-item-1 ${activeTab == 1 ? "is-active" : ""} `}
@@ -681,6 +726,49 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                 setEditUserDraft((p) => ({ ...(p || {}), address: e.target.value }))
               }
             ></textarea>
+          </div>
+
+          {/* Personality categories A..G (admin-only view) */}
+          <div className="col-12">
+            <div className="border-top-light pt-20 mt-10">
+              <h3 className="text-18 fw-700 text-dark-1">
+                {translatedTexts?.personalityCategoriesTitleText ||
+                  "Catégories de personnalité"}
+              </h3>
+              {personalityCategoryStats.hasAny ? (
+                <div className="mt-10">
+                  <table className="table table-striped">
+                    <thead>
+                      <tr>
+                        <th>{translatedTexts?.personalityCategoryColText || "Catégorie"}</th>
+                        <th>{translatedTexts?.personalityScoreColText || "Score"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {personalityCategoryStats.letters.map((l) => {
+                        const s = personalityCategoryStats.stats[l];
+                        const pct = s.total ? Math.round((s.yes / s.total) * 100) : 0;
+                        return (
+                          <tr key={l}>
+                            <td>{`CATEGORIA ${l}`}</td>
+                            <td>{`${pct}% (${s.yes}/${s.total})`}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="text-13 text-light-1">
+                    {translatedTexts?.personalityCategoriesHintText ||
+                      "Calcul basé sur les questions de personnalité (réponses Oui/Non)."}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-10">
+                  {translatedTexts?.personalityCategoriesEmptyText ||
+                    "Aucune réponse de personnalité trouvée pour ce profil."}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* <div className="col-12">

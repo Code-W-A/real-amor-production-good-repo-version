@@ -246,6 +246,20 @@ export default async function page({ params }) {
     adminSaveUserText: await fetchTranslation("Enregistrer", targetLanguage),
     adminSavingUserText: await fetchTranslation("Enregistrement...", targetLanguage),
     adminUserSavedText: await fetchTranslation("Modifications enregistrées.", targetLanguage),
+    personalityCategoriesTitleText: await fetchTranslation(
+      "Catégories de personnalité",
+      targetLanguage
+    ),
+    personalityCategoryColText: await fetchTranslation("Catégorie", targetLanguage),
+    personalityScoreColText: await fetchTranslation("Score", targetLanguage),
+    personalityCategoriesHintText: await fetchTranslation(
+      "Calcul basé sur les questions de personnalité (réponses Oui/Non).",
+      targetLanguage
+    ),
+    personalityCategoriesEmptyText: await fetchTranslation(
+      "Aucune réponse de personnalité trouvée pour ce profil.",
+      targetLanguage
+    ),
   };
 
   return (
