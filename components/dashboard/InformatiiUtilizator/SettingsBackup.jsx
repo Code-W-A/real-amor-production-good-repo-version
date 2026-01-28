@@ -153,9 +153,9 @@ export default function Settings({ translatedTexts }) {
               if (typeof value === "string") return value.trim();
               return value;
             };
-            const isCompatible =
-              currentQuestion.answer &&
-              matchedQuestion.answer &&
+          const isCompatible =
+            currentQuestion.answer &&
+            matchedQuestion.answer &&
               JSON.stringify(normalizeAnswer(currentQuestion.answer)) ===
                 JSON.stringify(normalizeAnswer(matchedQuestion.answer));
 

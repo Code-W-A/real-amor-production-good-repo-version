@@ -1,16 +1,18 @@
 import Image from "next/image";
 import { useSearchParams } from "next/navigation"; // Folosim useSearchParams în loc de useRouter
 import React, { useState, useEffect } from "react";
-import { deleteDoc, doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
+import { doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
 import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul configurat pentru Firebase
 import AlertBox from "@/components/uiElements/AlertBox";
 import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "./QuizResultsDocument";
+import { useAuth } from "@/context/AuthContext";
 
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
   const uid = searchParams.get("uid"); // Extragem UID-ul din query-ul URL-ului
+  const { currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true); // Loader pentru a afișa în timp ce datele sunt preluate
   const [isActivated, setIsActivated] = useState(false); // Stare pentru a gestiona isActivated
@@ -47,38 +49,26 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
-  const deleteUserFromFirestore = async (uid) => {
-    try {
-      const userDocRef = doc(db, "Users", uid); // Referință către documentul utilizatorului în Firestore
-      await deleteDoc(userDocRef); // Ștergem documentul utilizatorului
-      console.log("User deleted from Firestore successfully.");
-    } catch (error) {
-      console.error("Error deleting user from Firestore:", error);
-    }
-  };
-
   const handleDeleteUser = async () => {
     if (!uid) return;
     setShowConfirmDialog(false);
     try {
       setIsDeleting(true); // Arată mesajul de încărcare
 
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
       // Realizează ștergerea utilizatorului atât din Authentication, cât și din Firestore
-      const deleteFromAuth = fetch("/api/delete-user", {
+      const deleteFromAuth = fetch("/api/admin-delete-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ uid }),
       });
 
-      const deleteFromFirestore = deleteDoc(doc(db, "Users", uid));
-
-      // Așteptăm finalizarea ambelor promisiuni
-      const [authResponse] = await Promise.all([
-        deleteFromAuth,
-        deleteFromFirestore,
-      ]);
+      const authResponse = await deleteFromAuth;
 
       if (authResponse.ok) {
         setAlertMessage({
@@ -91,8 +81,8 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           "User deleted from Authentication and Firestore successfully."
         );
       } else {
-        // Dacă ștergerea din Authentication nu a reușit, anulăm și ștergerea din Firestore
-        throw new Error(translatedTexts.errorDeleteUserText);
+        const data = await authResponse.json().catch(() => ({}));
+        throw new Error(data?.error || translatedTexts.errorDeleteUserText);
       }
     } catch (error) {
       setAlertMessage({

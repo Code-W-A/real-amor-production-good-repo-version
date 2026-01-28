@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { useSearchParams } from "next/navigation"; // Folosim useSearchParams în loc de useRouter
 import React, { useRef, useState, useEffect } from "react";
-import { deleteDoc, doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
+import { doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
 import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul configurat pentru Firebase
 import AlertBox from "@/components/uiElements/AlertBox";
 import { Router, useRouter } from "next/navigation";
@@ -79,16 +79,6 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       console.error("Error fetching user data:", error);
     } finally {
       setLoading(false); // Oprim loader-ul
-    }
-  };
-
-  const deleteUserFromFirestore = async (uid) => {
-    try {
-      const userDocRef = doc(db, "Users", uid); // Referință către documentul utilizatorului în Firestore
-      await deleteDoc(userDocRef); // Ștergem documentul utilizatorului
-      console.log("User deleted from Firestore successfully.");
-    } catch (error) {
-      console.error("Error deleting user from Firestore:", error);
     }
   };
 
@@ -244,22 +234,20 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     try {
       setIsDeleting(true); // Arată mesajul de încărcare
 
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
       // Realizează ștergerea utilizatorului atât din Authentication, cât și din Firestore
-      const deleteFromAuth = fetch("/api/delete-user", {
+      const deleteFromAuth = fetch("/api/admin-delete-user", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ uid }),
       });
 
-      const deleteFromFirestore = deleteDoc(doc(db, "Users", uid));
-
-      // Așteptăm finalizarea ambelor promisiuni
-      const [authResponse] = await Promise.all([
-        deleteFromAuth,
-        deleteFromFirestore,
-      ]);
+      const authResponse = await deleteFromAuth;
 
       if (authResponse.ok) {
         setAlertMessage({
@@ -272,8 +260,8 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           "User deleted from Authentication and Firestore successfully."
         );
       } else {
-        // Dacă ștergerea din Authentication nu a reușit, anulăm și ștergerea din Firestore
-        throw new Error(translatedTexts.errorDeleteUserText);
+        const data = await authResponse.json().catch(() => ({}));
+        throw new Error(data?.error || translatedTexts.errorDeleteUserText);
       }
     } catch (error) {
       setAlertMessage({
@@ -602,10 +590,10 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                 <option value="female">{translatedTexts.femmeText}</option>
               </select>
             ) : (
-              <input
-                readOnly
-                required
-                type="text"
+            <input
+              readOnly
+              required
+              type="text"
                 value={
                   userData?.gender === "male"
                     ? translatedTexts.hommeText
@@ -613,7 +601,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                     ? translatedTexts.femmeText
                     : userData?.gender || ""
                 }
-              />
+            />
             )}
           </div>
           <div className="col-md-6">
@@ -680,20 +668,20 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                 <option value="friendship">{translatedTexts.amitieText}</option>
               </select>
             ) : (
-              <input
-                readOnly
-                required
-                type="text"
-                value={
-                  userData?.purpose === "love"
-                    ? translatedTexts.amourText
-                    : userData?.purpose === "casual"
-                    ? translatedTexts.sexText
-                    : userData?.purpose === "friendship"
-                    ? translatedTexts.amitieText
-                    : ""
-                }
-              />
+            <input
+              readOnly
+              required
+              type="text"
+              value={
+                userData?.purpose === "love"
+                  ? translatedTexts.amourText
+                  : userData?.purpose === "casual"
+                  ? translatedTexts.sexText
+                  : userData?.purpose === "friendship"
+                  ? translatedTexts.amitieText
+                  : ""
+              }
+            />
             )}
           </div>
 
@@ -1140,26 +1128,26 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             </button>
           </div>
 
-          <div
-            className="col-12 mt-20"
-            style={{ display: "flex", alignItems: "center" }}
-          >
-            <input
-              type="checkbox"
-              checked={currentlyInCouple}
-              onChange={toggleCurrentlyInCouple}
-              className="large-checkbox"
-              style={{
-                width: "22px",
-                height: "22px",
-                marginRight: "10px",
-                cursor: "pointer",
-              }}
-            />
-            <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+            <div
+              className="col-12 mt-20"
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              <input
+                type="checkbox"
+                checked={currentlyInCouple}
+                onChange={toggleCurrentlyInCouple}
+                className="large-checkbox"
+                style={{
+                  width: "22px",
+                  height: "22px",
+                  marginRight: "10px",
+                  cursor: "pointer",
+                }}
+              />
+              <span style={{ fontSize: "16px", fontWeight: "bold" }}>
               {translatedTexts.currentlyInCoupleText || "În prezent în cuplu"}
-            </span>
-          </div>
+              </span>
+            </div>
         </form>
       </div>
       {showConfirmDialog && (

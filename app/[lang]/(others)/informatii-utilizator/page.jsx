@@ -52,7 +52,12 @@ export default async function page({ params }) {
     tarifsText: await fetchTranslation("Tarifs", targetLanguage),
     adminText: await fetchTranslation("Panneau d'administration", targetLanguage),
     usersText: await fetchTranslation("Utilisateurs", targetLanguage),
+    deletedUsersText: await fetchTranslation(
+      "Utilisateurs supprimés",
+      targetLanguage
+    ),
     disconnectText: await fetchTranslation("Déconnexion", targetLanguage),
+    promotionsText: await fetchTranslation("Promotions", targetLanguage),
     listaUtilizatoriText: await fetchTranslation(
       "Liste des utilisateurs",
       targetLanguage
@@ -279,7 +284,9 @@ export default async function page({ params }) {
               <Sidebar
                 adminText={translatedTexts.adminText}
                 usersText={translatedTexts.usersText}
+                deletedUsersText={translatedTexts.deletedUsersText}
                 disconnectText={translatedTexts.disconnectText}
+                promotionsText={translatedTexts.promotionsText}
               />
             </div>
             <Settings translatedTexts={translatedTexts} />

@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { deleteDoc, doc } from "firebase/firestore";
 import { ref, deleteObject } from "firebase/storage";
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
-  deleteUser,
 } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
-import { db, storage, authentication } from "@/firebase"; // Importăm corect Firebase Firestore și Storage
+import { storage, authentication } from "@/firebase"; // Importăm corect Firebase Firestore și Storage
 import { useRouter } from "next/navigation";
 
 import { handleLogout } from "@/utils/authUtils";
@@ -122,11 +120,21 @@ export default function CloseAccount({ activeTab, translatedTexts }) {
       // Așteptăm să fie șterse toate fișierele din storage
       await Promise.all([...imageDeletePromises, videoDeletePromise]);
 
-      // Ștergerea documentului utilizatorului din Firestore
-      await deleteDoc(doc(db, "Users", userData.uid));
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
 
-      // Ștergerea contului utilizatorului din Firebase Authentication
-      await deleteUser(user);
+      const closeRes = await fetch("/api/close-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: "self_close" }),
+      });
+      const closeData = await closeRes.json().catch(() => ({}));
+      if (!closeRes.ok || !closeData?.success) {
+        throw new Error(closeData?.error || "Failed to close account");
+      }
 
       // Redirecționează utilizatorul după ștergere și oprește sesiunea
       handleLogout();
