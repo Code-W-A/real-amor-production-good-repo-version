@@ -27,6 +27,13 @@ function buildSnapshot(userData) {
   return out;
 }
 
+function genderToFr(value) {
+  if (value === "male") return "Homme";
+  if (value === "female") return "Femme";
+  if (value === "other") return "Autre";
+  return null;
+}
+
 export async function POST(request) {
   try {
     const auth = await requireAuth(request);
@@ -39,11 +46,16 @@ export async function POST(request) {
     const userSnap = await userRef.get();
     const userData = userSnap.exists ? userSnap.data() : null;
 
+    const reasonText =
+      typeof reason === "string" && reason.trim()
+        ? reason.trim().slice(0, 500)
+        : "self_close";
     const deletedRecord = {
       uid,
       username: userData?.username || null,
       email: userData?.email || null,
       gender: userData?.gender || null,
+      genderLabelFr: genderToFr(userData?.gender),
       registrationDate: userData?.registrationDate || null,
       subscriptionStatus: userData?.subscriptionStatus || null,
       deletedAt: Timestamp.now(),
@@ -51,7 +63,12 @@ export async function POST(request) {
       deletedByEmail: auth.email || null,
       deletedByRole: "user",
       deletionSource: "self_close",
-      deletionReason: reason ? String(reason).slice(0, 500) : null,
+      deletionReason: reasonText,
+      deletionSourceLabelFr: "Supprimé par utilisateur",
+      deletionReasonLabelFr:
+        reasonText === "self_close"
+          ? "Compte fermé par utilisateur"
+          : reasonText,
       snapshot: buildSnapshot(userData),
     };
 

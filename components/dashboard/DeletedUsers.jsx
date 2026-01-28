@@ -144,7 +144,11 @@ export default function DeletedUsers({ translatedTexts }) {
           <div>{translatedTexts.loadingText}</div>
         ) : (
           <div className="row y-gap-30 pt-30">
-            <table className="table table-striped">
+            <div className="table-responsive" style={{ overflowX: "auto" }}>
+              <table
+                className="table table-striped"
+                style={{ minWidth: 900 }}
+              >
               <thead>
                 <tr>
                   <th>{translatedTexts.userText}</th>
@@ -166,7 +170,8 @@ export default function DeletedUsers({ translatedTexts }) {
                   />
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
 

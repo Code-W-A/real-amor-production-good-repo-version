@@ -44,7 +44,7 @@ export default function Sidebar({
           href={"/deleted-users"}
           className="d-flex items-center text-17 lh-1 fw-500 "
         >
-          <i className={`text-20 icon-warning mr-15`}></i>
+          <i className={`text-20 icon-close mr-15`}></i>
           {deletedUsersText}
         </Link>
       </div>
