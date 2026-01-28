@@ -3,6 +3,10 @@ import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
 
+// This route depends on request headers (Authorization), so it must be dynamic at runtime.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function clampLimit(raw) {
   const n = Number(raw);
   if (!Number.isFinite(n)) return 200;
