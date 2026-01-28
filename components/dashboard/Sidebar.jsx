@@ -35,7 +35,7 @@ export default function Sidebar({
           className="d-flex items-center text-17 lh-1 fw-500 "
         >
           <i className={`text-20 icon-coupon mr-15`}></i>
-          {promotionsText}
+          {promotionsText || "Promoții"}
         </Link>
       </div>
 

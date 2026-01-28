@@ -48,9 +48,7 @@ export default function DeletedUsers({ translatedTexts }) {
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(
-            data?.error || translatedTexts.deletedUsersLoadErrorText
-          );
+          throw new Error(data?.error || "Failed to load deleted users");
         }
         const list = Array.isArray(data?.items) ? data.items : [];
         setItems(list);
@@ -125,7 +123,7 @@ export default function DeletedUsers({ translatedTexts }) {
             style={{ display: "flex", alignItems: "center", gap: 10 }}
           >
             <span style={{ fontWeight: "bold" }}>
-              {translatedTexts.usersPerPageLabelText}
+              {translatedTexts?.usersPerPageLabelText || "Utilizatori / pagină"}
             </span>
             <select
               value={itemsPerPage}
