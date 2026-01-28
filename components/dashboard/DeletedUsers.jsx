@@ -113,6 +113,7 @@ export default function DeletedUsers({ translatedTexts }) {
             <input
               type="text"
               placeholder={translatedTexts.searchText}
+              aria-label={translatedTexts.searchText}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
@@ -127,6 +128,7 @@ export default function DeletedUsers({ translatedTexts }) {
             </span>
             <select
               value={itemsPerPage}
+              aria-label={translatedTexts?.usersPerPageLabelText}
               onChange={(e) => setItemsPerPage(Number(e.target.value))}
               className="form-control"
               style={{ minWidth: 120 }}
