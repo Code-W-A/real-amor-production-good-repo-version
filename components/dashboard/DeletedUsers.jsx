@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/firebase";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import Pagination from "../common/Pagination";
 import DeletedUsersRow from "./DashBoardCards/DeletedUsersRow";
 
@@ -40,17 +42,14 @@ export default function DeletedUsers({ translatedTexts }) {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const token = await currentUser?.getIdToken?.();
-        if (!token) return;
-
-        const res = await fetch("/api/admin-deleted-users?limit=1000", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data?.error || "Failed to load deleted users");
-        }
-        const list = Array.isArray(data?.items) ? data.items : [];
+        if (!currentUser) return;
+        const ref = collection(db, "DeletedUsers");
+        const q = query(ref, orderBy("deletedAt", "desc"), limit(1000));
+        const snap = await getDocs(q);
+        const list = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setItems(list);
         setFilteredItems(list);
       } catch (error) {

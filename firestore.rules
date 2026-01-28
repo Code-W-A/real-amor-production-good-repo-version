@@ -24,6 +24,17 @@ service cloud.firestore {
       return isString(x) && x.matches('^sub_[A-Za-z0-9_]+$');
     }
 
+    function adminUids() {
+      return get(/databases/$(database)/documents/Config/AdminUids).data.uids;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/Config/AdminUids) &&
+        (adminUids() is list) &&
+        adminUids().hasAny([request.auth.uid]);
+    }
+
     function paymentsAppendOnly(prev, next) {
       // Allow missing payments on either side
       return !(prev is map) || !(next is map) ||
@@ -59,9 +70,20 @@ service cloud.firestore {
         );
     }
 
+    match /Config/AdminUids {
+      // Do not expose the admin list to clients.
+      allow read, write: if false;
+    }
+
     match /Config/{docId} {
       // Promo config is read client-side
       allow read: if true;
+      allow write: if false;
+    }
+
+    match /DeletedUsers/{docId} {
+      // Only admins can read deleted users.
+      allow read: if isAdmin();
       allow write: if false;
     }
 
