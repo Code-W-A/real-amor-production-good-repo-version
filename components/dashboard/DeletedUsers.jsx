@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/firebase";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import Pagination from "../common/Pagination";
 import DeletedUsersRow from "./DashBoardCards/DeletedUsersRow";
 
@@ -42,18 +42,39 @@ export default function DeletedUsers({ translatedTexts }) {
   useEffect(() => {
     const fetchItems = async () => {
       try {
+        console.log("[deleted-users] fetch start", {
+          hasUser: !!currentUser,
+          uid: currentUser?.uid || null,
+        });
         if (!currentUser) return;
-        const ref = collection(db, "DeletedUsers");
-        const q = query(ref, orderBy("deletedAt", "desc"), limit(1000));
+        const ref = collection(db, "Users");
+        const q = query(
+          ref,
+          where("deletedAccount.isDeleted", "==", true),
+          orderBy("deletedAccount.deletedAt", "desc"),
+          limit(1000)
+        );
         const snap = await getDocs(q);
+        console.log("[deleted-users] query done", {
+          size: snap.size,
+          empty: snap.empty,
+        });
         const list = snap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
+        console.log("[deleted-users] items mapped", {
+          count: list.length,
+          sample: list[0] || null,
+        });
         setItems(list);
         setFilteredItems(list);
       } catch (error) {
-        console.error("Error fetching deleted users:", error);
+        console.error("[deleted-users] fetch error", {
+          message: error?.message,
+          code: error?.code,
+          error,
+        });
       } finally {
         setLoading(false);
       }
@@ -74,8 +95,10 @@ export default function DeletedUsers({ translatedTexts }) {
         item?.username,
         item?.email,
         item?.uid,
-        item?.deletedByEmail,
-        item?.deletedByUid,
+        item?.deletedAccount?.deletedByEmail,
+        item?.deletedAccount?.deletedByUid,
+        item?.deletedAccount?.deletionSource,
+        item?.deletedAccount?.deletionReason,
       ]
         .filter(Boolean)
         .join(" ")
@@ -160,6 +183,9 @@ export default function DeletedUsers({ translatedTexts }) {
                   <th>{translatedTexts.genText}</th>
                   <th>{translatedTexts.deletionSourceText}</th>
                   <th>{translatedTexts.deletionReasonText}</th>
+                  <th style={{ width: 140, minWidth: 140 }}>
+                    {translatedTexts.actiuniText || "Acțiuni"}
+                  </th>
                 </tr>
               </thead>
               <tbody>

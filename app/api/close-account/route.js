@@ -3,37 +3,6 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 
-function buildSnapshot(userData) {
-  if (!userData || typeof userData !== "object") return {};
-  const fields = [
-    "username",
-    "email",
-    "phone",
-    "gender",
-    "purpose",
-    "age",
-    "registrationDate",
-    "subscriptionStatus",
-    "subscriptionId",
-    "lifetimeAccess",
-    "lifetimeSessionId",
-    "currentlyInCouple",
-    "isActivated",
-  ];
-  const out = {};
-  for (const key of fields) {
-    if (typeof userData[key] !== "undefined") out[key] = userData[key];
-  }
-  return out;
-}
-
-function genderToFr(value) {
-  if (value === "male") return "Homme";
-  if (value === "female") return "Femme";
-  if (value === "other") return "Autre";
-  return null;
-}
-
 export async function POST(request) {
   try {
     const auth = await requireAuth(request);
@@ -43,21 +12,13 @@ export async function POST(request) {
     const uid = auth.uid;
 
     const userRef = adminDb.collection("Users").doc(uid);
-    const userSnap = await userRef.get();
-    const userData = userSnap.exists ? userSnap.data() : null;
 
     const reasonText =
       typeof reason === "string" && reason.trim()
         ? reason.trim().slice(0, 500)
         : "self_close";
-    const deletedRecord = {
-      uid,
-      username: userData?.username || null,
-      email: userData?.email || null,
-      gender: userData?.gender || null,
-      genderLabelFr: genderToFr(userData?.gender),
-      registrationDate: userData?.registrationDate || null,
-      subscriptionStatus: userData?.subscriptionStatus || null,
+    const deletedAccount = {
+      isDeleted: true,
       deletedAt: Timestamp.now(),
       deletedByUid: uid,
       deletedByEmail: auth.email || null,
@@ -69,14 +30,9 @@ export async function POST(request) {
         reasonText === "self_close"
           ? "Compte fermé par utilisateur"
           : reasonText,
-      snapshot: buildSnapshot(userData),
     };
 
-    await adminDb.collection("DeletedUsers").add(deletedRecord);
-
-    if (userSnap.exists) {
-      await userRef.delete();
-    }
+    await userRef.set({ deletedAccount }, { merge: true });
 
     try {
       await adminAuth.deleteUser(uid);

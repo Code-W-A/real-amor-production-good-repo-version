@@ -296,7 +296,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   color: "red",
                 }}
               >
-                Utilizatorul nu a finalizat chestionarul de intrebari
+                L'utilisateur n'a pas terminé le questionnaire.
               </span>
             </div>
           )}

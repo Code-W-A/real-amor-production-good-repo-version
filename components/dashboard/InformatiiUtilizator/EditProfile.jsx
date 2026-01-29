@@ -440,13 +440,32 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   })();
 
+  const isDeletedAccount = !!userData?.deletedAccount?.isDeleted;
+
   return (
     <div
       className={`tabs__pane -tab-item-1 ${activeTab == 1 ? "is-active" : ""} `}
     >
       <div className="row pb-50 mb-10">
-        <div className="col-auto">
-          <h1 className="text-30 lh-12 fw-700">{userData.username}</h1>
+        <div className="col-auto" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h1 className="text-30 lh-12 fw-700" style={{ margin: 0 }}>
+            {userData.username}
+          </h1>
+          {userData?.deletedAccount?.isDeleted ? (
+            <span
+              style={{
+                backgroundColor: "#d32f2f",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 600,
+                lineHeight: 1.2,
+              }}
+            >
+              Compte supprimé
+            </span>
+          ) : null}
           {/* <div className="mt-10">
               Lorem ipsum dolor sit amet, consectetur.
             </div> */}
@@ -796,44 +815,47 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   color: "red",
                 }}
               >
-                Utilizatorul nu a finalizat chestionarul de intrebari
+                L'utilisateur n'a pas terminé le questionnaire.
               </span>
             </div>
           )}
 
-          <div
-            className="col-12"
-            style={{ display: "flex", alignItems: "center" }}
-          >
-            {userData?.reservation?.status === "paid" ? (
-              <span
-                style={{
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  color: "green",
-                }}
-              >
-                {translatedTexts.paidForReservationText}
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  color: "red",
-                }}
-              >
-                {translatedTexts.hasNotPaidForReservationText}
-              </span>
-            )}
-          </div>
+          {!isDeletedAccount ? (
+            <div
+              className="col-12"
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              {userData?.reservation?.status === "paid" ? (
+                <span
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    color: "green",
+                  }}
+                >
+                  {translatedTexts.paidForReservationText}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    color: "red",
+                  }}
+                >
+                  {translatedTexts.hasNotPaidForReservationText}
+                </span>
+              )}
+            </div>
+          ) : null}
 
-          {userData?.isActivated ? (
-            userData.subscriptionActive ||
-            userData.subscriptionStatus === "canceledUntilEnd" ? (
-              <>
+          {!isDeletedAccount ? (
+            userData?.isActivated ? (
+              userData.subscriptionActive ||
+              userData.subscriptionStatus === "canceledUntilEnd" ? (
+                <>
                 {/*
                   Lifetime users don't have subscriptionStartDate/subscriptionEndDate/subscriptionId/subscriptionAmount.
                   They use lifetimePurchasedAt/lifetimeAmount/lifetimeSessionId instead.
@@ -1021,7 +1043,18 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                     )}
                   </div>
                 ) : null}
-              </>
+                </>
+              ) : (
+                <p
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    textAlign: "start",
+                  }}
+                >
+                  {translatedTexts.noSubscriptionText}
+                </p>
+              )
             ) : (
               <p
                 style={{
@@ -1030,22 +1063,12 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   textAlign: "start",
                 }}
               >
-                {translatedTexts.noSubscriptionText}
+                {translatedTexts.accountNotActivatedText}
               </p>
             )
-          ) : (
-            <p
-              style={{
-                fontSize: "18px",
-                fontWeight: "bold",
-                textAlign: "start",
-              }}
-            >
-              {translatedTexts.accountNotActivatedText}
-            </p>
-          )}
+          ) : null}
 
-          {userData ? (
+          {userData && !isDeletedAccount ? (
             <div
               className="col-12 mt-20"
               style={{ display: "flex", alignItems: "center", gap: 12 }}
@@ -1068,86 +1091,94 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             </div>
           ) : null}
 
-          <div
-            className="col-12"
-            style={{ display: "flex", alignItems: "center" }}
-          >
-            {/* <input
-              type="checkbox"
-              checked={isActivated}
-              onChange={toggleActivation}
-              className="large-checkbox"
-              style={{
-                width: "25px",
-                height: "25px",
-                marginRight: "10px",
-                cursor: "pointer",
-              }}
-            /> */}
-            <span
-              style={{
-                fontSize: "18px",
-                fontWeight: "bold",
-                textAlign: "center",
-              }}
-            >
-              {isActivated
-                ? translatedTexts.contActivText
-                : translatedTexts.contDezactivatText}
-            </span>
-          </div>
-
-          <div
-            className="col-4 mt-20"
-            style={{ display: "flex", justifyContent: "flex-start" }}
-          >
-            <button
-              type="button"
-              onClick={toggleActivation}
-              className="button -md -green-5"
-            >
-              {isActivated
-                ? translatedTexts.deactivateContText
-                : translatedTexts.activateContText}
-            </button>
-          </div>
-
-          <div
-            className="col-8 mt-20"
-            style={{ display: "flex", justifyContent: "flex-start" }}
-          >
-            <button
-              type="button"
-              onClick={() => setShowConfirmDialog(true)}
-              className="button -md -purple-1"
-              disabled={isDeleting}
-            >
-              {isDeleting
-                ? translatedTexts.deletingUserText
-                : translatedTexts.deleteUserText}
-            </button>
-          </div>
-
+          {!isDeletedAccount ? (
             <div
-              className="col-12 mt-20"
+              className="col-12"
               style={{ display: "flex", alignItems: "center" }}
             >
-              <input
+              {/* <input
                 type="checkbox"
-                checked={currentlyInCouple}
-                onChange={toggleCurrentlyInCouple}
+                checked={isActivated}
+                onChange={toggleActivation}
                 className="large-checkbox"
                 style={{
-                  width: "22px",
-                  height: "22px",
+                  width: "25px",
+                  height: "25px",
                   marginRight: "10px",
                   cursor: "pointer",
                 }}
-              />
-              <span style={{ fontSize: "16px", fontWeight: "bold" }}>
-              {translatedTexts.currentlyInCoupleText || "În prezent în cuplu"}
+              /> */}
+              <span
+                style={{
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                }}
+              >
+                {isActivated
+                  ? translatedTexts.contActivText
+                  : translatedTexts.contDezactivatText}
               </span>
             </div>
+          ) : null}
+
+          {!isDeletedAccount ? (
+            <div
+              className="col-4 mt-20"
+              style={{ display: "flex", justifyContent: "flex-start" }}
+            >
+              <button
+                type="button"
+                onClick={toggleActivation}
+                className="button -md -green-5"
+              >
+                {isActivated
+                  ? translatedTexts.deactivateContText
+                  : translatedTexts.activateContText}
+              </button>
+            </div>
+          ) : null}
+
+          {!isDeletedAccount ? (
+            <div
+              className="col-8 mt-20"
+              style={{ display: "flex", justifyContent: "flex-start" }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowConfirmDialog(true)}
+                className="button -md -purple-1"
+                disabled={isDeleting}
+              >
+                {isDeleting
+                  ? translatedTexts.deletingUserText
+                  : translatedTexts.deleteUserText}
+              </button>
+            </div>
+          ) : null}
+
+            {!isDeletedAccount ? (
+              <div
+                className="col-12 mt-20"
+                style={{ display: "flex", alignItems: "center" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={currentlyInCouple}
+                  onChange={toggleCurrentlyInCouple}
+                  className="large-checkbox"
+                  style={{
+                    width: "22px",
+                    height: "22px",
+                    marginRight: "10px",
+                    cursor: "pointer",
+                  }}
+                />
+                <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+                  {translatedTexts.currentlyInCoupleText || "În prezent în cuplu"}
+                </span>
+              </div>
+            ) : null}
         </form>
       </div>
       {showConfirmDialog && (

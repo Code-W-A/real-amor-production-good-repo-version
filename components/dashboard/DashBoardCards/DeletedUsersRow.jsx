@@ -1,4 +1,5 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 
 function formatDeletedAt(value) {
   if (!value) return null;
@@ -12,8 +13,9 @@ function formatDeletedAt(value) {
 }
 
 export default function DeletedUsersRow({ data, translatedTexts }) {
+  const router = useRouter();
   const na = translatedTexts?.naText || "";
-  const deletedAt = formatDeletedAt(data?.deletedAt) || na;
+  const deletedAt = formatDeletedAt(data?.deletedAccount?.deletedAt) || na;
   const isFrench = translatedTexts?.lang === "fr";
   const genderValue = data?.gender;
   const genderLabel =
@@ -26,33 +28,54 @@ export default function DeletedUsersRow({ data, translatedTexts }) {
       ? translatedTexts?.genderOtherText
       : null);
 
-  const sourceValue = data?.deletionSource;
+  const sourceValue = data?.deletedAccount?.deletionSource;
   const sourceLabel =
-    (isFrench && data?.deletionSourceLabelFr) ||
+    (isFrench && data?.deletedAccount?.deletionSourceLabelFr) ||
     (sourceValue === "self_close"
       ? translatedTexts?.deletionSourceSelfCloseText
       : sourceValue === "admin_delete"
       ? translatedTexts?.deletionSourceAdminDeleteText
       : null);
 
-  const reasonValue = data?.deletionReason;
+  const reasonValue = data?.deletedAccount?.deletionReason;
   const reasonLabel =
-    (isFrench && data?.deletionReasonLabelFr) ||
+    (isFrench && data?.deletedAccount?.deletionReasonLabelFr) ||
     (reasonValue === "self_close"
       ? translatedTexts?.deletionReasonSelfCloseText
       : reasonValue === "admin_delete"
       ? translatedTexts?.deletionReasonAdminDeleteText
       : null);
+  const handleRowClick = () => {
+    const userUid = data?.uid || data?.id;
+    if (!userUid) return;
+    router.push(`/informatii-utilizator?uid=${userUid}`);
+  };
+
   return (
-    <tr>
+    <tr onClick={handleRowClick} style={{ cursor: "pointer" }}>
       <td>{data?.username || na}</td>
       <td>{data?.email || na}</td>
       <td>{deletedAt}</td>
-      <td>{data?.deletedByEmail || data?.deletedByUid || na}</td>
+      <td>
+        {data?.deletedAccount?.deletedByEmail ||
+          data?.deletedAccount?.deletedByUid ||
+          na}
+      </td>
       <td>{data?.registrationDate || na}</td>
       <td>{genderLabel || genderValue || na}</td>
       <td>{sourceLabel || sourceValue || na}</td>
       <td>{reasonLabel || reasonValue || na}</td>
+      <td style={{ width: 140, minWidth: 140 }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRowClick();
+          }}
+          className="btn btn-primary"
+        >
+          {translatedTexts?.veziDetaliiText || "Vezi detalii"}
+        </button>
+      </td>
     </tr>
   );
 }

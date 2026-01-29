@@ -61,8 +61,12 @@ export default function MyCourses({ translatedTexts }) {
           ...doc.data(),
         }));
 
+        const activeUsers = usersList.filter(
+          (user) => !user?.deletedAccount?.isDeleted
+        );
+
         // Sortare utilizatori după `registrationDate`
-        usersList.sort((a, b) => {
+        activeUsers.sort((a, b) => {
           const dateA = new Date(
             a.registrationDate.split("-").reverse().join("-")
           );
@@ -72,8 +76,8 @@ export default function MyCourses({ translatedTexts }) {
           return dateB - dateA;
         });
 
-        setUsers(usersList);
-        setFilteredUsers(usersList);
+        setUsers(activeUsers);
+        setFilteredUsers(activeUsers);
       } catch (error) {
         console.error("Error fetching users: ", error);
       }
