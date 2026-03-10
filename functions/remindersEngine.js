@@ -231,6 +231,10 @@ async function runReminderStage(stage, opts) {
       skipped: [],
       failed: [],
       sample: [],
+      wouldSendCount: 0,
+      wouldSkipCount: 0,
+      wouldSend: [],
+      wouldSkip: [],
     };
   }
 
@@ -239,6 +243,23 @@ async function runReminderStage(stage, opts) {
   const capped = candidates.slice(0, limit);
 
   if (action === "preview") {
+    const wouldSend = [];
+    const wouldSkip = [];
+    for (const user of capped) {
+      const inCooldown = isReminderInCooldown(user.userData, stage, config.cooldownHours);
+      const row = {
+        uid: user.uid,
+        email: user.email,
+        username: user.username,
+        inCooldown,
+      };
+      if (inCooldown && !force) {
+        wouldSkip.push({ ...row, reason: "cooldown" });
+      } else {
+        wouldSend.push(row);
+      }
+    }
+
     return {
       stage,
       totalMatched: candidates.length,
@@ -249,6 +270,10 @@ async function runReminderStage(stage, opts) {
         username: u.username,
         inCooldown: isReminderInCooldown(u.userData, stage, config.cooldownHours),
       })),
+      wouldSendCount: wouldSend.length,
+      wouldSkipCount: wouldSkip.length,
+      wouldSend,
+      wouldSkip,
       attempted: 0,
       sentCount: 0,
       skippedCount: 0,

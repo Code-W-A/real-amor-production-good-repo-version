@@ -18,6 +18,7 @@ export default function MyCourses({ translatedTexts }) {
   const [exportingFormat, setExportingFormat] = useState("");
   const [reminderStage, setReminderStage] = useState("quiz_incomplete");
   const [isRemindersLoading, setIsRemindersLoading] = useState(false);
+  const [reminderReport, setReminderReport] = useState(null);
   const router = useRouter();
   const params = useParams();
 
@@ -173,35 +174,91 @@ export default function MyCourses({ translatedTexts }) {
     try {
       setIsRemindersLoading(true);
       const runReminders = httpsCallable(functionsClient, "runRemindersCallable");
+      const limit = action === "send" ? 50 : 200;
       const result = await runReminders({
         action,
         stage: reminderStage,
-        limit: 200,
+        limit,
       });
       const data = result?.data || {};
       const stageResult = Array.isArray(data?.stageResults)
         ? data.stageResults.find((s) => s.stage === reminderStage) || data.stageResults[0]
         : null;
 
+      const getEmailLines = (rows, max = 40) => {
+        const list = Array.isArray(rows) ? rows : [];
+        if (!list.length) return ["none"];
+        const trimmed = list.slice(0, max).map((row) => row?.email).filter(Boolean);
+        const hiddenCount = Math.max(0, list.length - trimmed.length);
+        return hiddenCount > 0 ? [...trimmed, `... +${hiddenCount} more`] : trimmed;
+      };
+
       if (action === "preview") {
         const matched = Number(stageResult?.totalMatched || data?.summary?.totalMatched || 0);
         const previewed = Number(stageResult?.totalPreviewed || data?.summary?.totalPreviewed || 0);
-        alert(
-          `Preview ${reminderStage}\nMatched: ${matched}\nPreviewed: ${previewed}`
-        );
+        const wouldSendCount = Number(stageResult?.wouldSendCount || 0);
+        const wouldSkipCount = Number(stageResult?.wouldSkipCount || 0);
+        setReminderReport({
+          action,
+          stage: reminderStage,
+          stats: [
+            { label: "Matched", value: matched },
+            { label: "Previewed", value: previewed },
+            { label: "Would send now", value: wouldSendCount },
+            { label: "Would skip (cooldown)", value: wouldSkipCount },
+          ],
+          sections: [
+            {
+              title: "Emails to send",
+              lines: getEmailLines(stageResult?.wouldSend, 80),
+            },
+            {
+              title: "Skipped emails",
+              lines: getEmailLines(stageResult?.wouldSkip, 50),
+            },
+          ],
+        });
       } else {
         const sentCount = Number(stageResult?.sentCount || data?.summary?.sentCount || 0);
         const skippedCount = Number(stageResult?.skippedCount || data?.summary?.skippedCount || 0);
         const failedCount = Number(stageResult?.failedCount || data?.summary?.failedCount || 0);
-        alert(
-          `Send ${reminderStage}\nSent: ${sentCount}\nSkipped: ${skippedCount}\nFailed: ${failedCount}`
-        );
+        setReminderReport({
+          action,
+          stage: reminderStage,
+          stats: [
+            { label: "Sent", value: sentCount },
+            { label: "Skipped", value: skippedCount },
+            { label: "Failed", value: failedCount },
+          ],
+          sections: [
+            {
+              title: "Sent emails",
+              lines: getEmailLines(stageResult?.sent, 80),
+            },
+            {
+              title: "Skipped emails",
+              lines: getEmailLines(stageResult?.skipped, 50),
+            },
+            {
+              title: "Failed emails",
+              lines: getEmailLines(stageResult?.failed, 50),
+            },
+          ],
+        });
       }
     } catch (error) {
       console.error("Reminder action failed:", error);
       alert(error?.message || "Reminder action failed");
     } finally {
       setIsRemindersLoading(false);
+    }
+  };
+
+  const copyLines = async (lines) => {
+    try {
+      await navigator.clipboard.writeText((lines || []).join("\n"));
+    } catch (error) {
+      console.error("Copy failed:", error);
     }
   };
 
@@ -290,6 +347,81 @@ export default function MyCourses({ translatedTexts }) {
             </button>
           </div>
         </div>
+        {reminderReport ? (
+          <div
+            className="row mb-20"
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              padding: 16,
+              marginLeft: 0,
+              marginRight: 0,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <strong>
+                Reminder {reminderReport.action}: {reminderReport.stage}
+              </strong>
+              <button
+                type="button"
+                className="button -sm -gray-1 text-dark-1"
+                onClick={() => setReminderReport(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
+              {reminderReport.stats.map((item) => (
+                <span key={item.label} style={{ background: "#f6f8fb", padding: "6px 10px", borderRadius: 8 }}>
+                  {item.label}: <strong>{item.value}</strong>
+                </span>
+              ))}
+            </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              {reminderReport.sections.map((section) => (
+                <div key={section.title} style={{ border: "1px solid #eef0f3", borderRadius: 8, padding: 10 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <strong>{section.title}</strong>
+                    <button
+                      type="button"
+                      className="button -sm -gray-1 text-dark-1"
+                      onClick={() => copyLines(section.lines)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <pre
+                    style={{
+                      margin: 0,
+                      maxHeight: 220,
+                      overflow: "auto",
+                      background: "#fafbfc",
+                      borderRadius: 6,
+                      padding: 8,
+                    }}
+                  >
+                    {section.lines.join("\n")}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Afișăm utilizatorii într-un tabel */}
         <div className="row y-gap-30 pt-30">

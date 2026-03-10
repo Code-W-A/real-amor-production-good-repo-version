@@ -397,7 +397,9 @@ exports.runReminderSequences = functions.pubsub
     return null;
   });
 
-exports.runRemindersCallable = functions.https.onCall(async (data, context) => {
+exports.runRemindersCallable = functions
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .https.onCall(async (data, context) => {
   if (!context?.auth?.uid) {
     throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
   }
@@ -410,7 +412,8 @@ exports.runRemindersCallable = functions.https.onCall(async (data, context) => {
   const action = String(data?.action || "preview").toLowerCase();
   const stage = String(data?.stage || "all").toLowerCase();
   const force = data?.force === true;
-  const limit = Number(data?.limit || 200);
+  const defaultLimit = action === "send" ? 50 : 200;
+  const limit = Number(data?.limit || defaultLimit);
 
   const result = await runReminderEngine({
     db,
@@ -428,5 +431,5 @@ exports.runRemindersCallable = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", result?.error || "Invalid payload");
   }
 
-  return result;
-});
+    return result;
+  });
