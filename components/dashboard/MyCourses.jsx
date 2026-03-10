@@ -9,6 +9,8 @@ import { onAuthStateChanged } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { useParams, useRouter } from "next/navigation";
 
+const SHOW_REMINDER_TEST_CONTROLS = false;
+
 export default function MyCourses({ translatedTexts }) {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -315,39 +317,41 @@ export default function MyCourses({ translatedTexts }) {
               {exportingFormat === "xlsx" ? "Export..." : "Export Excel"}
             </button>
           </div>
-          <div className="col-auto" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <select
-              className="form-control"
-              value={reminderStage}
-              onChange={(e) => setReminderStage(e.target.value)}
-              style={{ minWidth: 220 }}
-            >
-              <option value="quiz_incomplete">Reminder: quiz incomplet</option>
-              <option value="booking_not_paid">Reminder: booking neplatit</option>
-              <option value="booking_not_scheduled">
-                Reminder: booking neprogramat
-              </option>
-              <option value="no_subscription">Reminder: fara abonament</option>
-            </select>
-            <button
-              type="button"
-              className="button -sm -gray-1 text-dark-1"
-              onClick={() => runReminderAction("preview")}
-              disabled={isRemindersLoading}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              className="button -sm -red-1 text-white"
-              onClick={() => runReminderAction("send")}
-              disabled={isRemindersLoading}
-            >
-              {isRemindersLoading ? "Running..." : "Send"}
-            </button>
-          </div>
+          {SHOW_REMINDER_TEST_CONTROLS ? (
+            <div className="col-auto" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <select
+                className="form-control"
+                value={reminderStage}
+                onChange={(e) => setReminderStage(e.target.value)}
+                style={{ minWidth: 220 }}
+              >
+                <option value="quiz_incomplete">Reminder: quiz incomplet</option>
+                <option value="booking_not_paid">Reminder: booking neplatit</option>
+                <option value="booking_not_scheduled">
+                  Reminder: booking neprogramat
+                </option>
+                <option value="no_subscription">Reminder: fara abonament</option>
+              </select>
+              <button
+                type="button"
+                className="button -sm -gray-1 text-dark-1"
+                onClick={() => runReminderAction("preview")}
+                disabled={isRemindersLoading}
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                className="button -sm -red-1 text-white"
+                onClick={() => runReminderAction("send")}
+                disabled={isRemindersLoading}
+              >
+                {isRemindersLoading ? "Running..." : "Send"}
+              </button>
+            </div>
+          ) : null}
         </div>
-        {reminderReport ? (
+        {SHOW_REMINDER_TEST_CONTROLS && reminderReport ? (
           <div
             className="row mb-20"
             style={{
