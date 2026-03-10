@@ -1,11 +1,14 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { authentication, db } from "../firebase";
 import { handleGetUserInfo } from "../utils/handleFirebaseQuery";
 import {
   handleGetFirestore,
   handleGetUserInfoJobs,
 } from "@/utils/firestoreUtils";
+import { isAdminUid } from "@/utils/adminUids";
+import { hasValidatedPhoneBundle } from "@/utils/phoneUtils";
 import {
   collection,
   doc,
@@ -26,6 +29,8 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState("en");
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const unsubscribe = authentication.onAuthStateChanged(async (user) => {
@@ -63,6 +68,26 @@ export const AuthProvider = ({ children }) => {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!currentUser?.uid) return;
+    if (!pathname) return;
+
+    // Admin users are excluded from the phone-completion gate.
+    if (isAdminUid(currentUser.uid)) return;
+
+    const pathParts = pathname.split("/").filter(Boolean);
+    const locale = pathParts[0] || "fr";
+    const completePhonePath = `/${locale}/complete-phone`;
+    const isOnCompletePhonePage =
+      pathname === completePhonePath || pathname.startsWith(`${completePhonePath}/`);
+    const hasPhone = hasValidatedPhoneBundle(userData);
+
+    if (!hasPhone && !isOnCompletePhonePage) {
+      router.replace(completePhonePath);
+    }
+  }, [loading, currentUser, userData, pathname, router]);
 
   const changeLanguage = (newLanguage) => {
     setLanguage(newLanguage);

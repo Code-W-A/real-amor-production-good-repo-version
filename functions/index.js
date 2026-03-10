@@ -1,6 +1,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const { runReminderEngine } = require("./remindersEngine");
 
 const Stripe = require("stripe");
 const stripe = new Stripe(functions.config().stripe.test_secret_key);
@@ -344,3 +345,88 @@ exports.sendSubscriptionEmail = functions.firestore
       return null;
     }
   });
+
+function parseAdminCsv(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const FALLBACK_ADMIN_UIDS = [
+  "SJTAqVztndgxISJAtnGzaSKieV02",
+  "feSm5lY3F7aFrWNWneYw8qbPkiT2",
+  "AcjykpO4W4M5JWCFPg0ZuxZVmiz1",
+  "5WrGR81tQua0GZpCMW4IyUoZV7K2",
+  "haLpd1x2lLZ3cSp68ldGXDPvZKQ2",
+];
+
+async function getAdminUidSetForFunctions() {
+  const envUids = parseAdminCsv(process.env.ADMIN_UIDS || process.env.NEXT_PUBLIC_ADMIN_UIDS);
+  if (envUids.length) return new Set(envUids);
+
+  try {
+    const configSnap = await db.collection("Config").doc("AdminUids").get();
+    const fromDoc = Array.isArray(configSnap.data()?.uids) ? configSnap.data().uids : [];
+    const cleaned = fromDoc.map((v) => String(v || "").trim()).filter(Boolean);
+    if (cleaned.length) return new Set(cleaned);
+  } catch (err) {
+    console.error("Failed loading admin UIDs from Config/AdminUids:", err);
+  }
+
+  return new Set(FALLBACK_ADMIN_UIDS);
+}
+
+exports.runReminderSequences = functions.pubsub
+  .schedule("0 9 * * *")
+  .onRun(async () => {
+    try {
+      const result = await runReminderEngine({
+        db,
+        admin,
+        transporter,
+        source: "scheduler",
+        action: "send",
+        stage: "all",
+      });
+      console.log("runReminderSequences result:", result?.status, result?.summary);
+    } catch (error) {
+      console.error("runReminderSequences failed:", error);
+    }
+    return null;
+  });
+
+exports.runRemindersCallable = functions.https.onCall(async (data, context) => {
+  if (!context?.auth?.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const adminUids = await getAdminUidSetForFunctions();
+  if (!adminUids.has(context.auth.uid)) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const action = String(data?.action || "preview").toLowerCase();
+  const stage = String(data?.stage || "all").toLowerCase();
+  const force = data?.force === true;
+  const limit = Number(data?.limit || 200);
+
+  const result = await runReminderEngine({
+    db,
+    admin,
+    transporter,
+    source: "callable",
+    actorUid: context.auth.uid,
+    action,
+    stage,
+    force,
+    limit,
+  });
+
+  if (!result?.ok) {
+    throw new functions.https.HttpsError("invalid-argument", result?.error || "Invalid payload");
+  }
+
+  return result;
+});

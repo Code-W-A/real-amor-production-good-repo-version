@@ -10,6 +10,7 @@ import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 import { questionsSet1, questionsSet2, questionsSet3 } from "@/data/quiz";
+import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
 
 function formatFirestoreDate(value) {
   if (!value) return null;
@@ -55,6 +56,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false);
   const [adminNotesSaveError, setAdminNotesSaveError] = useState("");
   const lastSavedAdminNotesRef = useRef("");
+  const phoneCountryOptions = getCountryPhoneOptions();
 
   const router = useRouter();
 
@@ -336,6 +338,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             ? ""
             : String(userData.age),
         phone: userData?.phone || "",
+        phoneCountry: userData?.phoneCountry || "BE",
         email: userData?.email || "",
         aboutMe: userData?.aboutMe || "",
         address: userData?.address || "",
@@ -346,6 +349,21 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const saveUserEdits = async () => {
     if (!uid) return;
     if (!editUserDraft) return;
+    const normalizedPhone = normalizePhone({
+      phone: editUserDraft?.phone || "",
+      selectedCountry: editUserDraft?.phoneCountry || null,
+      targetLanguage: userData?.targetLanguage,
+      strict: true,
+    });
+    if (!normalizedPhone.isValid) {
+      setAlertMessage({
+        type: "danger",
+        content:
+          translatedTexts?.phoneInvalidText || "Veuillez saisir un numero valide.",
+        showAlert: true,
+      });
+      return;
+    }
     try {
       setIsSavingUser(true);
       const token = await currentUser?.getIdToken?.();
@@ -641,6 +659,26 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
               {translatedTexts.phoneNumberText}
             </label>
+            {isEditMode ? (
+              <select
+                name="phoneCountry"
+                value={editUserDraft?.phoneCountry || "BE"}
+                onChange={(e) =>
+                  setEditUserDraft((p) => ({
+                    ...(p || {}),
+                    phoneCountry: e.target.value,
+                  }))
+                }
+                className="form-control"
+                style={{ marginBottom: 8 }}
+              >
+                {phoneCountryOptions.map((opt) => (
+                  <option key={opt.country} value={opt.country}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <input
               readOnly={!isEditMode}
               required

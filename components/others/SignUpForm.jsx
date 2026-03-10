@@ -20,6 +20,7 @@ import AlertBox from "../uiElements/AlertBox";
 import { useRouter } from "next/navigation";
 import { useTranslate } from "@/hooks/useTranslate";
 import { useAuth } from "@/context/AuthContext";
+import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
 
 const SignUpForm = ({
   signUpText,
@@ -65,6 +66,10 @@ const SignUpForm = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false); // Stare pentru checkbox-ul de acceptare
+  const [phoneCountry, setPhoneCountry] = useState(
+    targetLanguage === "nl" ? "NL" : "BE"
+  );
+  const phoneCountryOptions = getCountryPhoneOptions();
 
   const router = useRouter();
 
@@ -95,6 +100,18 @@ const SignUpForm = ({
     if (!formData.phone) {
       errors.phone = translatedLinks.phoneRequired;
       isValid = false;
+    } else {
+      const phoneCheck = normalizePhone({
+        phone: formData.phone,
+        targetLanguage,
+        selectedCountry: phoneCountry,
+        strict: true,
+      });
+      if (!phoneCheck.isValid) {
+        errors.phone =
+          translatedLinks.phoneInvalidText || "Please enter a valid phone number";
+        isValid = false;
+      }
     }
 
     if (!formData.address) {
@@ -212,6 +229,26 @@ const SignUpForm = ({
       return;
     }
 
+    const normalizedPhone = normalizePhone({
+      phone: formData.phone,
+      targetLanguage,
+      selectedCountry: phoneCountry,
+      strict: true,
+    });
+    if (!normalizedPhone.isValid) {
+      setFormErrors((prev) => ({
+        ...prev,
+        phone: translatedLinks.phoneInvalidText || "Please enter a valid phone number",
+      }));
+      setAlertMessage({
+        type: "danger",
+        content:
+          translatedLinks.phoneInvalidText || "Please enter a valid phone number",
+        showAlert: true,
+      });
+      return;
+    }
+
     setIsLoading(true); // Setează isLoading pe true la începutul procesului
 
     try {
@@ -270,7 +307,13 @@ const SignUpForm = ({
         uid: user.uid,
         email: formData.email,
         username: formData.username,
-        phone: formData.phone,
+        phone: normalizedPhone.phone,
+        phoneRaw: normalizedPhone.phoneRaw,
+        phoneDisplay: normalizedPhone.phoneDisplay,
+        phoneE164: normalizedPhone.phoneE164,
+        phoneCountry: normalizedPhone.phoneCountry,
+        phoneDialCode: normalizedPhone.phoneDialCode,
+        phoneFlag: normalizedPhone.phoneFlag,
         aboutMe: formData.aboutMe,
         images: sortedImages,
         video: uploadedVideo,
@@ -632,6 +675,20 @@ const SignUpForm = ({
                   <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                     {phonePlaceholder} *
                   </label>
+                  <div style={{ marginBottom: 8 }}>
+                    <select
+                      name="phoneCountry"
+                      value={phoneCountry}
+                      onChange={(e) => setPhoneCountry(e.target.value)}
+                      className="form-control"
+                    >
+                      {phoneCountryOptions.map((opt) => (
+                        <option key={opt.country} value={opt.country}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     type="text"
                     name="phone"

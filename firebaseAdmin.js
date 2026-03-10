@@ -1,5 +1,15 @@
 // lib/firebase.ts
-import admin from "firebase-admin";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const bufferModule = require("buffer");
+
+// Node 25 removed SlowBuffer; some legacy jwt deps still reference it.
+if (!bufferModule.SlowBuffer) {
+  bufferModule.SlowBuffer = bufferModule.Buffer;
+}
+
+const admin = require("firebase-admin");
 
 const config = {
   credential: admin.credential.cert({

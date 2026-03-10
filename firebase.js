@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 // Your Firebase configuration
@@ -25,5 +26,6 @@ const authentication = getAuth(app);
 const database = getDatabase(app);
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
+const functionsClient = getFunctions(app);
 
-export { storage, authentication, database, db };
+export { app, storage, authentication, database, db, functionsClient };

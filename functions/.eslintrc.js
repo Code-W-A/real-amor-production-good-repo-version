@@ -4,7 +4,7 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    "ecmaVersion": 2018,
+    "ecmaVersion": 2020,
   },
   extends: [
     "eslint:recommended",
@@ -14,6 +14,13 @@ module.exports = {
     "no-restricted-globals": ["error", "name", "length"],
     "prefer-arrow-callback": "error",
     "quotes": ["error", "double", {"allowTemplateLiterals": true}],
+    "indent": "off",
+    "max-len": "off",
+    "require-jsdoc": "off",
+    "object-curly-spacing": "off",
+    "comma-dangle": "off",
+    "operator-linebreak": "off",
+    "no-irregular-whitespace": "off",
   },
   overrides: [
     {

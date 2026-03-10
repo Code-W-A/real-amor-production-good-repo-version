@@ -3,6 +3,14 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
+import { normalizePhone } from "@/utils/phoneUtils";
+
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
 
 function pickAllowedUpdates(input) {
   const out = {};
@@ -16,6 +24,7 @@ function pickAllowedUpdates(input) {
     "purpose",
     "age",
     "phone",
+    "phoneCountry",
     "email",
     "aboutMe",
     "address",
@@ -40,6 +49,9 @@ function pickAllowedUpdates(input) {
   if (typeof out.gender === "string") out.gender = out.gender.trim().slice(0, 40);
   if (typeof out.purpose === "string") out.purpose = out.purpose.trim().slice(0, 40);
   if (typeof out.phone === "string") out.phone = out.phone.trim().slice(0, 40);
+  if (typeof out.phoneCountry === "string") {
+    out.phoneCountry = out.phoneCountry.trim().toUpperCase().slice(0, 2);
+  }
   if (typeof out.email === "string") out.email = out.email.trim().slice(0, 200);
   if (typeof out.aboutMe === "string") out.aboutMe = out.aboutMe.slice(0, 8000);
   if (typeof out.address === "string") out.address = out.address.slice(0, 1000);
@@ -68,6 +80,31 @@ function pickAllowedUpdates(input) {
     ) {
       delete out.purpose;
     }
+  }
+
+  if ("phoneCountry" in out) {
+    if (!/^[A-Z]{2}$/.test(out.phoneCountry || "")) {
+      delete out.phoneCountry;
+    }
+  }
+
+  // Keep legacy `phone`, but also persist normalized additive fields.
+  if ("phone" in out || "phoneCountry" in out) {
+    const normalized = normalizePhone({
+      phone: out.phone || "",
+      selectedCountry: out.phoneCountry || null,
+      strict: true,
+    });
+    if (!normalized.isValid) {
+      throw new ValidationError("Invalid phone number format");
+    }
+    out.phone = normalized.phone;
+    out.phoneRaw = normalized.phoneRaw;
+    out.phoneDisplay = normalized.phoneDisplay;
+    out.phoneE164 = normalized.phoneE164;
+    out.phoneCountry = normalized.phoneCountry;
+    out.phoneDialCode = normalized.phoneDialCode;
+    out.phoneFlag = normalized.phoneFlag;
   }
 
   return out;
@@ -110,6 +147,9 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, updated: patch }, { status: 200 });
   } catch (err) {
+    if (err instanceof ValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     console.error("admin-update-user error:", err);
     return NextResponse.json(
       { error: err?.message || "Internal Server Error" },

@@ -12,6 +12,7 @@ const FALLBACK_ADMIN_UIDS = [
   "feSm5lY3F7aFrWNWneYw8qbPkiT2",
   "AcjykpO4W4M5JWCFPg0ZuxZVmiz1",
   "5WrGR81tQua0GZpCMW4IyUoZV7K2",
+  "haLpd1x2lLZ3cSp68ldGXDPvZKQ2"
 ];
 
 function parseCsv(raw) {

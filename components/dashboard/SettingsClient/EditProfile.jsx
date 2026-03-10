@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from "uuid"; // Pentru a genera ID-uri unice pentru imag
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../InformatiiUtilizator/QuizResultsDocument";
 import { useRouter } from "next/navigation";
+import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
 
 const EditProfile = ({
   activeTab,
@@ -52,6 +53,8 @@ const EditProfile = ({
     showAlert: false,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [phoneCountry, setPhoneCountry] = useState("BE");
+  const phoneCountryOptions = getCountryPhoneOptions();
   const router = useRouter();
 
   useEffect(() => {
@@ -63,12 +66,15 @@ const EditProfile = ({
           const userInfo = userDoc.data();
           setFormData({
             username: userInfo.username || "",
-            phone: userInfo.phone || "",
+            phone: userInfo.phoneDisplay || userInfo.phone || "",
             aboutMe: userInfo.aboutMe || "",
             address: userInfo.address || "",
             gender: userInfo.gender,
             purpose: userInfo.purpose,
           });
+          setPhoneCountry(
+            userInfo.phoneCountry || (userInfo?.targetLanguage === "nl" ? "NL" : "BE")
+          );
           setTempImages(userInfo.images || []);
           setMainImageId(
             userInfo.images?.find((image) => image.isMain)?.fileName || null
@@ -166,6 +172,18 @@ const EditProfile = ({
     if (!formData.phone) {
       errors.phone = phoneRequired;
       isValid = false;
+    } else {
+      const phoneCheck = normalizePhone({
+        phone: formData.phone,
+        selectedCountry: phoneCountry,
+        targetLanguage: userData?.targetLanguage,
+        strict: true,
+      });
+      if (!phoneCheck.isValid) {
+        errors.phone =
+          translatedTexts.phoneInvalidText || "Please enter a valid phone number";
+        isValid = false;
+      }
     }
 
     if (!formData.address) {
@@ -188,8 +206,8 @@ const EditProfile = ({
   };
 
   const handleSubmit = async (e) => {
-    setIsLoading(true);
     e.preventDefault();
+    setIsLoading(true);
 
     if (!validateForm()) {
       setAlertMessage({
@@ -197,6 +215,28 @@ const EditProfile = ({
         content: completeFieldsError,
         showAlert: true,
       });
+      setIsLoading(false);
+      return;
+    }
+
+    const normalizedPhone = normalizePhone({
+      phone: formData.phone,
+      selectedCountry: phoneCountry,
+      targetLanguage: userData?.targetLanguage,
+      strict: true,
+    });
+    if (!normalizedPhone.isValid) {
+      setFormErrors((prev) => ({
+        ...prev,
+        phone: translatedTexts.phoneInvalidText || "Please enter a valid phone number",
+      }));
+      setAlertMessage({
+        type: "danger",
+        content:
+          translatedTexts.phoneInvalidText || "Please enter a valid phone number",
+        showAlert: true,
+      });
+      setIsLoading(false);
       return;
     }
 
@@ -266,10 +306,15 @@ const EditProfile = ({
 
       // Actualizează documentul utilizatorului în Firestore
       const userDocRef = doc(db, "Users", userData.uid);
-
       await updateDoc(userDocRef, {
         username: formData.username,
-        phone: formData.phone,
+        phone: normalizedPhone.phone,
+        phoneRaw: normalizedPhone.phoneRaw,
+        phoneDisplay: normalizedPhone.phoneDisplay,
+        phoneE164: normalizedPhone.phoneE164,
+        phoneCountry: normalizedPhone.phoneCountry,
+        phoneDialCode: normalizedPhone.phoneDialCode,
+        phoneFlag: normalizedPhone.phoneFlag,
         aboutMe: formData.aboutMe,
         images: updatedImages,
         video: uploadedVideoUrl ? uploadedVideoUrl : tempVideo,
@@ -536,6 +581,19 @@ const EditProfile = ({
                 <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                   {phoneLabel} *
                 </label>
+                <div style={{ marginBottom: 8 }}>
+                  <select
+                    value={phoneCountry}
+                    onChange={(e) => setPhoneCountry(e.target.value)}
+                    className="form-control"
+                  >
+                    {phoneCountryOptions.map((opt) => (
+                      <option key={opt.country} value={opt.country}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <input
                   type="text"
                   name="phone"
