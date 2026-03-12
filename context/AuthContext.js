@@ -17,10 +17,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import {
-  getLocaleFromPathname,
-  syncFirebaseAuthLanguage,
-} from "@/utils/firebaseAuthLocale";
+import { getLocaleFromPathname } from "@/utils/routeLocale";
 
 const AuthContext = createContext();
 
@@ -37,9 +34,7 @@ export const AuthProvider = ({ children }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const locale = getLocaleFromPathname(pathname);
-    setLanguage(locale);
-    syncFirebaseAuthLanguage(authentication, locale);
+    setLanguage(getLocaleFromPathname(pathname));
   }, [pathname]);
 
   useEffect(() => {

@@ -6,21 +6,20 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  sendPasswordResetEmail,
 } from "firebase/auth";
 import { authentication } from "@/firebase"; // Asigură-te că ai importat corect Firebase Auth
 import AlertBox from "@/components/uiElements/AlertBox";
-import {
-  getLocaleFromPathname,
-  syncFirebaseAuthLanguage,
-} from "@/utils/firebaseAuthLocale";
+import { getLocaleFromPathname } from "@/utils/routeLocale";
+import { requestPasswordReset } from "@/utils/requestPasswordReset";
 
 export default function Password({ activeTab, translatedTexts }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [emailForReset, setEmailForReset] = useState("");
+  const [isResetSending, setIsResetSending] = useState(false);
   const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname);
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -75,9 +74,12 @@ export default function Password({ activeTab, translatedTexts }) {
 
   const handlePasswordReset = async (e) => {
     e.preventDefault();
+    setIsResetSending(true);
     try {
-      syncFirebaseAuthLanguage(authentication, getLocaleFromPathname(pathname));
-      await sendPasswordResetEmail(authentication, emailForReset);
+      await requestPasswordReset({
+        email: emailForReset,
+        locale,
+      });
       setAlertMessage({
         type: "success",
         content: translatedTexts.resetEmailSuccess,
@@ -86,9 +88,11 @@ export default function Password({ activeTab, translatedTexts }) {
     } catch (error) {
       setAlertMessage({
         type: "danger",
-        content: error.message || translatedTexts.resetEmailError,
+        content: translatedTexts.resetEmailError,
         showAlert: true,
       });
+    } finally {
+      setIsResetSending(false);
     }
   };
 
@@ -161,7 +165,10 @@ export default function Password({ activeTab, translatedTexts }) {
         </div>
 
         <div className="col-12">
-          <button className="button -md -purple-1 text-white">
+          <button
+            className="button -md -purple-1 text-white"
+            disabled={isResetSending}
+          >
             {translatedTexts.sendResetEmailText}
           </button>
         </div>

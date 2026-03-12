@@ -3,7 +3,6 @@ import {
   deleteUser,
   reauthenticateWithCredential,
   sendEmailVerification,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateEmail,
@@ -105,15 +104,6 @@ export const handleDeleteAccount = async (currentPassword) => {
     });
   } catch (error) {
     console.error("error delete user auth or firestore...", error);
-  }
-};
-
-export const handleResetPassword = async (email) => {
-  const user = auth.currentUser;
-  try {
-    await sendPasswordResetEmail(auth, email);
-  } catch (error) {
-    console.error(error);
   }
 };
 

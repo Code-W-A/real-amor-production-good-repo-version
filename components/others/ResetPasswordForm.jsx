@@ -1,15 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { sendPasswordResetEmail } from "firebase/auth";
 import { usePathname } from "next/navigation";
 import AlertBox from "../uiElements/AlertBox";
 import Link from "next/link";
-import { authentication } from "@/firebase";
-import {
-  getLocaleFromPathname,
-  syncFirebaseAuthLanguage,
-} from "@/utils/firebaseAuthLocale";
+import { getLocaleFromPathname } from "@/utils/routeLocale";
+import { requestPasswordReset } from "@/utils/requestPasswordReset";
 
 export default function ResetPasswordForm({
   emailText,
@@ -25,7 +21,9 @@ export default function ResetPasswordForm({
     content: "",
     showAlert: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname);
 
   const handleChange = (e) => {
     setEmail(e.target.value);
@@ -35,10 +33,13 @@ export default function ResetPasswordForm({
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     setAlertMessage({ type: "", content: "", showAlert: false });
+    setIsSubmitting(true);
 
     try {
-      syncFirebaseAuthLanguage(authentication, getLocaleFromPathname(pathname));
-      await sendPasswordResetEmail(authentication, email);
+      await requestPasswordReset({
+        email,
+        locale,
+      });
       setAlertMessage({
         type: "success",
         content: successMessage,
@@ -48,9 +49,11 @@ export default function ResetPasswordForm({
       console.log("eroare la resetare parola: ", err);
       setAlertMessage({
         type: "danger",
-        content: errorMessage + err.message,
+        content: errorMessage,
         showAlert: true,
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -87,6 +90,7 @@ export default function ResetPasswordForm({
                   <button
                     type="submit"
                     className="button -md -purple-1 fw-500 w-1/1"
+                    disabled={isSubmitting}
                   >
                     {sendResetText}
                   </button>
@@ -105,7 +109,7 @@ export default function ResetPasswordForm({
 
               {/* Link pentru revenire la autentificare */}
               <div className="text-center mt-4">
-                <Link href="/login" className="text-purple-1">
+                <Link href={`/${locale}/login`} className="text-purple-1">
                   {loginRedirectText}
                 </Link>
               </div>
