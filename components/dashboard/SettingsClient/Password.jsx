@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import React, { useState } from "react";
 import {
   updatePassword,
@@ -7,12 +10,17 @@ import {
 } from "firebase/auth";
 import { authentication } from "@/firebase"; // Asigură-te că ai importat corect Firebase Auth
 import AlertBox from "@/components/uiElements/AlertBox";
+import {
+  getLocaleFromPathname,
+  syncFirebaseAuthLanguage,
+} from "@/utils/firebaseAuthLocale";
 
 export default function Password({ activeTab, translatedTexts }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [emailForReset, setEmailForReset] = useState("");
+  const pathname = usePathname();
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -68,6 +76,7 @@ export default function Password({ activeTab, translatedTexts }) {
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     try {
+      syncFirebaseAuthLanguage(authentication, getLocaleFromPathname(pathname));
       await sendPasswordResetEmail(authentication, emailForReset);
       setAlertMessage({
         type: "success",

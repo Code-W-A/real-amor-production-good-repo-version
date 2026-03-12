@@ -1,11 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { getAuth, sendPasswordResetEmail } from "firebase/auth";
-import { useRouter } from "next/navigation"; // Pentru redirecționare
+import { sendPasswordResetEmail } from "firebase/auth";
+import { usePathname } from "next/navigation";
 import AlertBox from "../uiElements/AlertBox";
 import Link from "next/link";
 import { authentication } from "@/firebase";
+import {
+  getLocaleFromPathname,
+  syncFirebaseAuthLanguage,
+} from "@/utils/firebaseAuthLocale";
 
 export default function ResetPasswordForm({
   emailText,
@@ -21,7 +25,7 @@ export default function ResetPasswordForm({
     content: "",
     showAlert: false,
   });
-  const router = useRouter();
+  const pathname = usePathname();
 
   const handleChange = (e) => {
     setEmail(e.target.value);
@@ -33,6 +37,7 @@ export default function ResetPasswordForm({
     setAlertMessage({ type: "", content: "", showAlert: false });
 
     try {
+      syncFirebaseAuthLanguage(authentication, getLocaleFromPathname(pathname));
       await sendPasswordResetEmail(authentication, email);
       setAlertMessage({
         type: "success",
