@@ -5,6 +5,7 @@ import {
   normalizePasswordResetLocale,
 } from "../_utils/passwordResetEmail";
 import { sendMail } from "../_utils/mailer";
+import { getSafeOrigin } from "../_utils/requestOrigin";
 
 export const runtime = "nodejs";
 
@@ -12,19 +13,6 @@ const APP_NAME = "Real Amor";
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function getBaseUrl(request) {
-  const configuredUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "").trim();
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/$/, "");
-  }
-
-  try {
-    return new URL(request.url).origin.replace(/\/$/, "");
-  } catch {
-    return "";
-  }
 }
 
 async function getUserPreferredLocale(uid) {
@@ -63,7 +51,7 @@ export async function POST(request) {
 
     const locale =
       requestedLocale || (await getUserPreferredLocale(userRecord.uid)) || "fr";
-    const baseUrl = getBaseUrl(request);
+    const baseUrl = getSafeOrigin(request);
     if (!baseUrl) {
       throw new Error("Missing base URL for password reset flow");
     }
