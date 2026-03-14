@@ -429,27 +429,29 @@ export default function MyCourses({ translatedTexts }) {
 
         {/* Afișăm utilizatorii într-un tabel */}
         <div className="row y-gap-30 pt-30">
-          <table className="table table-striped">
-            <thead>
-              <tr>
-                <th>{translatedTexts.userText}</th>
-                <th>{translatedTexts.emailText}</th>
-                <th>{translatedTexts.registrationDateText}</th>
-                <th>{translatedTexts.genText}</th>
-                <th>{translatedTexts.contActivText}</th>
-                <th>{translatedTexts.actiuniText}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentUsers.map((user) => (
-                <CoursesCardDashboard
-                  data={user}
-                  key={user.id}
-                  translatedTexts={translatedTexts}
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="table-responsive" style={{ overflowX: "auto" }}>
+            <table className="table table-striped" style={{ minWidth: 900 }}>
+              <thead>
+                <tr>
+                  <th>{translatedTexts.userText}</th>
+                  <th>{translatedTexts.emailText}</th>
+                  <th>{translatedTexts.registrationDateText}</th>
+                  <th>{translatedTexts.genText}</th>
+                  <th>{translatedTexts.contActivText}</th>
+                  <th>{translatedTexts.actiuniText}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentUsers.map((user) => (
+                  <CoursesCardDashboard
+                    data={user}
+                    key={user.id}
+                    translatedTexts={translatedTexts}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="row justify-center pt-30">
