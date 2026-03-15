@@ -3,14 +3,16 @@
 import React, { useEffect, useState } from "react";
 import { useCalendlyEventListener, InlineWidget } from "react-calendly";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/firebase"; // Presupunând că `db` este instanța de Firestore configurată
 import { DotLoader } from "react-spinners";
+import { withLocalePath } from "@/utils/routeLocale";
 
 const Calendar = ({ translatedLinks }) => {
   const { currentUser, loading: loadingContext, userData } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [selectedOption, setSelectedOption] = useState(""); // Starea pentru opțiunea selectată
   const [calendlyUrl, setCalendlyUrl] = useState(""); // Stare pentru URL-ul de Calendly
   const [isRedirecting, setIsRedirecting] = useState(true);
@@ -21,16 +23,16 @@ const Calendar = ({ translatedLinks }) => {
       // router.push("/signup");
     }
     if (!loadingContext && userData?.reservation?.hasReserved) {
-      router.push("/profil-client");
+      router.push(withLocalePath(pathname, "/profil-client"));
     }
     if (!loadingContext && userData?.reservation?.status !== "paid") {
-      router.push("/pricing");
+      router.push(withLocalePath(pathname, "/pricing"));
     }
     if (!loadingContext && !userData?.responses) {
-      router.push("/quiz");
+      router.push(withLocalePath(pathname, "/quiz"));
     }
     setIsRedirecting(false);
-  }, [loadingContext]);
+  }, [loadingContext, pathname, userData, router]);
 
   // Ascultă evenimentul de programare cu useCalendlyEventListener
   useCalendlyEventListener({
@@ -41,14 +43,14 @@ const Calendar = ({ translatedLinks }) => {
           await updateDoc(userDocRef, {
             "reservation.hasReserved": true,
           });
-          -console.log("Rezervare actualizată cu succes în Firestore");
+          console.log("Rezervare actualizată cu succes în Firestore");
         } catch (error) {
           console.error("Eroare la actualizarea rezervării:", error);
         }
       }
 
       // Redirecționează către pagina „Thank You”
-      router.push("/thank-you");
+      router.push(withLocalePath(pathname, "/thank-you"));
     },
   });
 

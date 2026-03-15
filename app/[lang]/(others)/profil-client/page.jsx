@@ -81,14 +81,14 @@ export default async function page({ params }) {
       targetLanguage
     ),
     chatText: await fetchTranslation("Chat", targetLanguage),
-    profileText: await fetchTranslation("Profile", targetLanguage),
+    profileText: await fetchTranslation("Profil", targetLanguage),
     deconectareText: await fetchTranslation("Se Déconnecter", targetLanguage),
     // Traducerile pentru butoane
-    editProfileText: await fetchTranslation("Edit Profile", targetLanguage),
+    editProfileText: await fetchTranslation("Profil", targetLanguage),
     passwordText: await fetchTranslation("Password", targetLanguage),
     closeAccountText: await fetchTranslation("Close Account", targetLanguage),
     profileSettingsText: await fetchTranslation(
-      "Profile Settings",
+      "Paramètres du profil",
       targetLanguage
     ),
 
@@ -234,7 +234,7 @@ export default async function page({ params }) {
       "Le genre est obligatoire",
       targetLanguage
     ),
-    genText: await fetchTranslation("Gender", targetLanguage),
+    genText: await fetchTranslation("Sexe", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
     selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),
@@ -273,10 +273,7 @@ export default async function page({ params }) {
       "Ajouter une video",
       targetLanguage
     ),
-    activeSubText: await fetchTranslation(
-      "Active subscription",
-      targetLanguage
-    ),
+    activeSubText: await fetchTranslation("Activer le compte", targetLanguage),
     reactivateSubscriptionText: await fetchTranslation(
       "Reactivate subscription",
       targetLanguage
@@ -289,9 +286,15 @@ export default async function page({ params }) {
       "Abonnement réactivé avec succès",
       targetLanguage
     ),
-    quizText: await fetchTranslation("Quiz", targetLanguage),
-    downloadQuizText: await fetchTranslation("Download quiz", targetLanguage),
-    retakeQuizText: await fetchTranslation("Retake quiz", targetLanguage),
+    quizText: await fetchTranslation("Questionnaire", targetLanguage),
+    downloadQuizText: await fetchTranslation(
+      "Télécharger le Questionnaire",
+      targetLanguage
+    ),
+    retakeQuizText: await fetchTranslation(
+      "Refaire le Questionnaire",
+      targetLanguage
+    ),
   };
 
   return (

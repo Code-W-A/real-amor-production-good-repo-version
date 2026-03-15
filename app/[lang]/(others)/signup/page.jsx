@@ -94,7 +94,7 @@ export default async function Page({ params }) {
       "Le genre est obligatoire",
       targetLanguage
     ),
-    genText: await fetchTranslation("Gender", targetLanguage),
+    genText: await fetchTranslation("Sexe", targetLanguage),
     hommeText: await fetchTranslation("Homme", targetLanguage),
     femmeText: await fetchTranslation("Femme", targetLanguage),
     selecteazaText: await fetchTranslation("Sélectionner", targetLanguage),

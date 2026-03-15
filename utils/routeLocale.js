@@ -20,3 +20,12 @@ export const getLocaleFromPathname = (pathname, fallback = "fr") => {
 
   return normalizeRouteLocale(locale, fallback);
 };
+
+export const withLocalePath = (pathname, targetPath, fallback = "fr") => {
+  const locale = getLocaleFromPathname(pathname, fallback);
+  const normalizedTargetPath = `/${String(targetPath || "")
+    .trim()
+    .replace(/^\/+/, "")}`;
+
+  return `/${locale}${normalizedTargetPath}`.replace(/\/\//g, "/");
+};

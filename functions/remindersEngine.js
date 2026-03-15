@@ -67,14 +67,14 @@ const REMINDER_STAGES = {
   no_subscription: {
     cooldownHours: 72,
     messages: {
-      fr: {
-        subject: "RealAmor: activez votre abonnement",
-        body: (username) =>
-          `Bonjour ${username || ""},\n\n` +
-          "Votre parcours est avancé. Activez un abonnement pour entrer dans la phase de matching.\n\n" +
-          "Lien: https://app.real-amor.com/subscriptions\n\n" +
-          "Cordialement,\nL'équipe RealAmor",
-      },
+     fr: {
+  subject: "RealAmor: activez votre abonnement",
+  body: (username) =>
+    `Bonjour ${username || ""},\n\n` +
+    "Continuez votre suivi avec RealAmor. Activez un abonnement pour entrer dans la phase de matching.\n\n" +
+    "Lien : https://app.real-amor.com/subscriptions\n\n" +
+    "Cordialement,\nL'équipe RealAmor",
+},
       nl: {
         subject: "RealAmor: activeer je abonnement",
         body: (username) =>
@@ -112,10 +112,41 @@ function hasActiveSubscription(userData) {
   );
 }
 
+function hasCompletedQuiz(userData) {
+  const responses = userData?.responses;
+  if (!responses || typeof responses !== "object") return false;
+
+  return Object.values(responses).some(
+    (group) => Array.isArray(group) && group.some((item) => item?.answer !== undefined)
+  );
+}
+
+function hasPaidReservation(userData) {
+  const status = String(userData?.reservation?.status || "").toLowerCase();
+  if (["paid", "complete", "completed", "succeeded"].includes(status)) {
+    return true;
+  }
+
+  return Boolean(
+    userData?.reservation?.sessionId ||
+      (typeof userData?.reservation?.cost === "number" && userData.reservation.cost > 0)
+  );
+}
+
+function hasScheduledReservation(userData) {
+  return (
+    userData?.reservation?.hasReserved === true ||
+    !!userData?.reservation?.scheduledAt ||
+    !!userData?.reservation?.bookedAt ||
+    !!userData?.reservation?.calendlyEventUri ||
+    !!userData?.reservation?.inviteeUri
+  );
+}
+
 function matchesReminderStage(userData, stage) {
-  const quizCompleted = !!userData?.responses;
-  const bookingPaid = userData?.reservation?.status === "paid";
-  const bookingScheduled = userData?.reservation?.hasReserved === true;
+  const quizCompleted = hasCompletedQuiz(userData);
+  const bookingPaid = hasPaidReservation(userData);
+  const bookingScheduled = hasScheduledReservation(userData);
   const subscribed = hasActiveSubscription(userData);
 
   if (stage === "quiz_incomplete") return !quizCompleted;
@@ -142,6 +173,47 @@ function getReminderMessage(stage, userData) {
   if (!config) return null;
   const language = getReminderLanguage(userData);
   return config.messages?.[language] || config.messages?.fr || null;
+}
+
+async function sendReminderForUser(stage, user, opts) {
+  const { admin, transporter, force = false } = opts;
+  const config = REMINDER_STAGES[stage];
+  if (!config) {
+    return { status: "skipped", reason: "invalid_stage" };
+  }
+
+  const inCooldown = isReminderInCooldown(user.userData, stage, config.cooldownHours);
+  if (inCooldown && !force) {
+    return { status: "skipped", reason: "cooldown" };
+  }
+
+  const message = getReminderMessage(stage, user.userData);
+  if (!message) {
+    return { status: "skipped", reason: "missing_template" };
+  }
+
+  const info = await transporter.sendMail({
+    from: process.env.MAIL_FROM || "office@real-amor.com",
+    to: user.email,
+    subject: message.subject,
+    text: message.body(user.username),
+  });
+
+  const previousCount = Number(user.userData?.reminders?.[stage]?.count || 0);
+  await user.userRef.set(
+    {
+      reminders: {
+        [stage]: {
+          lastSentAt: admin.firestore.FieldValue.serverTimestamp(),
+          count: previousCount + 1,
+          lastMessageId: info?.messageId || null,
+        },
+      },
+    },
+    { merge: true }
+  );
+
+  return { status: "sent", messageId: info?.messageId || null };
 }
 
 async function acquireReminderRunLock(db, admin, runId) {
@@ -290,39 +362,21 @@ async function runReminderStage(stage, opts) {
 
   for (const user of capped) {
     try {
-      const inCooldown = isReminderInCooldown(user.userData, stage, config.cooldownHours);
-      if (inCooldown && !force) {
-        skipped.push({ uid: user.uid, email: user.email, reason: "cooldown" });
-        continue;
-      }
-
-      const message = getReminderMessage(stage, user.userData);
-      if (!message) {
-        skipped.push({ uid: user.uid, email: user.email, reason: "missing_template" });
-        continue;
-      }
-
-      const info = await transporter.sendMail({
-        from: process.env.MAIL_FROM || "office@real-amor.com",
-        to: user.email,
-        subject: message.subject,
-        text: message.body(user.username),
+      const outcome = await sendReminderForUser(stage, user, {
+        admin,
+        transporter,
+        force: !!force,
       });
+      if (outcome.status === "sent") {
+        sent.push({ uid: user.uid, email: user.email });
+        continue;
+      }
 
-      const previousCount = Number(user.userData?.reminders?.[stage]?.count || 0);
-      await user.userRef.set(
-        {
-          reminders: {
-            [stage]: {
-              lastSentAt: admin.firestore.FieldValue.serverTimestamp(),
-              count: previousCount + 1,
-              lastMessageId: info?.messageId || null,
-            },
-          },
-        },
-        { merge: true }
-      );
-      sent.push({ uid: user.uid, email: user.email });
+      skipped.push({
+        uid: user.uid,
+        email: user.email,
+        reason: outcome.reason || "skipped",
+      });
     } catch (error) {
       failed.push({
         uid: user.uid,
@@ -509,5 +563,7 @@ async function runReminderEngine(opts) {
 
 module.exports = {
   REMINDER_STAGES,
+  matchesReminderStage,
+  sendReminderForUser,
   runReminderEngine,
 };

@@ -22,7 +22,7 @@ import {
 import QuestionWithApiValidation from "./QuestionWithApiValidation";
 import { prepareResponses } from "@/utils/quizUtils";
 import AlertBox from "../uiElements/AlertBox";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DotLoader } from "react-spinners";
 import DatePicker from "react-datepicker";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -32,6 +32,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import IntroductionQuiz from "./SettingsClient/IntroductionQuiz";
 import EvitaRaspuns from "./EvitaRaspuns";
 import { translateTextQuiz } from "@/utils/translationUtils";
+import { withLocalePath } from "@/utils/routeLocale";
 
 const DEV_AUTOFILL =
   process.env.NODE_ENV !== "production" &&
@@ -250,6 +251,7 @@ export default function QuizClient({
   };
 
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleDateChange = (date) => {
     const currentQuestion = currentQuestions[currentQuestionIndex];
@@ -277,15 +279,15 @@ export default function QuizClient({
     }
     if (!loadingContext && !userData?.username) {
       console.log("no userData...", userData?.username);
-      router.push("/signup");
+      router.push(withLocalePath(pathname, "/signup"));
     }
     // If the user already paid the reservation, never send them back to pricing.
     if (!loadingContext && userData?.reservation?.hasReserved) {
-      router.push("/profil-client");
+      router.push(withLocalePath(pathname, "/profil-client"));
     } else if (!loadingContext && userData?.reservation?.status === "paid") {
-      router.push("/booking");
+      router.push(withLocalePath(pathname, "/booking"));
     } else if (!loadingContext && userData?.responses) {
-      router.push("/pricing");
+      router.push(withLocalePath(pathname, "/pricing"));
     }
     setIsRedirecting(false);
   }, [loadingContext]);
@@ -1120,10 +1122,10 @@ export default function QuizClient({
   // };
 
   if (quizFinished && isEditQuiz) {
-    router.push("/profil-client");
+    router.push(withLocalePath(pathname, "/profil-client"));
   }
   if (quizFinished && !isEditQuiz) {
-    router.push("/pricing");
+    router.push(withLocalePath(pathname, "/pricing"));
     return <FinishedQuizComp translatedLinks={translatedLinks} />;
   }
 
@@ -1670,7 +1672,11 @@ export default function QuizClient({
                             {/* Afișăm câmpul input pentru "Autre" dacă allowsCustom este true */}
                             {currentQuestion.allowsCustom && (
                               <div className="form-group mt-20">
-                                <h3>{translatedLinks.autreText}</h3>
+                                <h3>
+                                  {currentQuestion.text === "Quel est votre métier ?"
+                                    ? translatedLinks.metierCustomLabelText
+                                    : translatedLinks.autreText}
+                                </h3>
                                 <input
                                   type="text"
                                   placeholder={

@@ -1,7 +1,11 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
-const { runReminderEngine } = require("./remindersEngine");
+const {
+  runReminderEngine,
+  matchesReminderStage,
+  sendReminderForUser,
+} = require("./remindersEngine");
 
 const Stripe = require("stripe");
 const stripe = new Stripe(functions.config().stripe.test_secret_key);
@@ -344,6 +348,44 @@ exports.sendSubscriptionEmail = functions.firestore
       // Dacă abonamentul nu a fost activat, nu trimitem email
       return null;
     }
+  });
+
+exports.sendFunnelTransitionEmails = functions.firestore
+  .document("Users/{userId}")
+  .onUpdate(async (change) => {
+    const previousUser = change.before.data() || {};
+    const newUser = change.after.data() || {};
+
+    if (newUser?.deletedAccount?.isDeleted) return null;
+    if (!newUser?.email) return null;
+
+    const user = {
+      userRef: change.after.ref,
+      uid: change.after.id,
+      email: newUser.email,
+      username: newUser.username || "",
+      userData: newUser,
+    };
+
+    const stagesToSend = ["booking_not_paid", "booking_not_scheduled"];
+
+    for (const stage of stagesToSend) {
+      const matchedBefore = matchesReminderStage(previousUser, stage);
+      const matchedAfter = matchesReminderStage(newUser, stage);
+      if (matchedBefore || !matchedAfter) continue;
+
+      try {
+        await sendReminderForUser(stage, user, {
+          admin,
+          transporter,
+          force: false,
+        });
+      } catch (error) {
+        console.error(`Failed sending transition reminder for ${stage}:`, error);
+      }
+    }
+
+    return null;
   });
 
 function parseAdminCsv(raw) {

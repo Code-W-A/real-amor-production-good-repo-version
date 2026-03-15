@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { withLocalePath } from "@/utils/routeLocale";
 
 export default function FinishedQuizComp({ translatedLinks }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   return (
     <section className="layout-pt-lg pt-120 layout-pb-md">
@@ -39,7 +41,7 @@ export default function FinishedQuizComp({ translatedLinks }) {
                     <div className="col-auto">
                       <button
                         className="button px-40 py-20 fw-500 -purple-1 text-white"
-                        onClick={() => router.push("/pricing")}
+                        onClick={() => router.push(withLocalePath(pathname, "/pricing"))}
                       >
                         {
                           translatedLinks.chestionarFinalizatPaginaPrincipalaText

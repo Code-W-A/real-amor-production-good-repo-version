@@ -3,10 +3,11 @@
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { pricingData } from "../../data/pricing";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
+import { withLocalePath } from "@/utils/routeLocale";
 
 // Verifică dacă variabila de mediu este definită
 const stripePromise = loadStripe(
@@ -29,6 +30,7 @@ export default function Pricing({
   const [isAccepted, setIsAccepted] = useState(false); // Stare pentru checkbox-ul de termeni și condiții
   const [isRedirecting, setIsRedirecting] = useState(true); // Stare pentru checkbox-ul de termeni și condiții
   const router = useRouter();
+  const pathname = usePathname();
   const { currentUser, loading: loadingContext, userData } = useAuth();
 
   const handleCheckboxChange = (event) => {
@@ -98,20 +100,20 @@ export default function Pricing({
     if (loadingContext) {
       setIsRedirecting(true); // Afișăm spinnerul cât timp loadingContext este true
     } else if (!userData?.username) {
-      router.push("/signup");
+      router.push(withLocalePath(pathname, "/signup"));
     } else if (
       userData?.reservation?.status === "paid" &&
       !userData?.reservation?.hasReserved
     ) {
-      router.push("/booking");
+      router.push(withLocalePath(pathname, "/booking"));
     } else if (userData?.reservation?.hasReserved) {
-      router.push("/profil-client");
+      router.push(withLocalePath(pathname, "/profil-client"));
     } else if (!userData?.responses) {
-      router.push("/quiz");
+      router.push(withLocalePath(pathname, "/quiz"));
     } else {
       setIsRedirecting(false); // Ascundem spinnerul după ce verificările s-au finalizat
     }
-  }, [loadingContext, userData, router]);
+  }, [loadingContext, pathname, userData, router]);
 
   // Afișează spinnerul pe centrul ecranului dacă este în stare de redirect
   if (isRedirecting) {

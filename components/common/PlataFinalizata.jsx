@@ -3,7 +3,7 @@
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
   arrayUnion,
@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { DotLoader } from "react-spinners";
+import { withLocalePath } from "@/utils/routeLocale";
 
 export default function PaymentSuccessPage({
   paymentTitle,
@@ -32,6 +33,7 @@ export default function PaymentSuccessPage({
   const [reservationData, setReservationData] = useState(null);
   const [isUpdated, setIsUpdated] = useState(false);
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const session_id = searchParams?.get("session_id");
   const {
     currentUser,
@@ -236,7 +238,7 @@ export default function PaymentSuccessPage({
                 <div className="col-auto mt-40">
                   <div className="row x-gap-10 y-gap-10 justify-center">
                     <div className="col-auto">
-                      <Link href="/booking">
+                      <Link href={withLocalePath(pathname, "/booking")}>
                         <button className="button px-40 py-20 fw-500 -purple-1 text-white">
                           {continueBookingText}
                         </button>

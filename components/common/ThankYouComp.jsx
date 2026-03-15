@@ -3,8 +3,9 @@
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
+import { withLocalePath } from "@/utils/routeLocale";
 
 export default function ThankYouReservation({
   reservationTitle,
@@ -26,6 +27,7 @@ export default function ThankYouReservation({
   const [reservationDetails, setReservationDetails] = useState(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Simulează preluarea datelor pentru rezervare (dacă este necesar)
@@ -81,7 +83,9 @@ export default function ThankYouReservation({
                       {currentUser?.uid && userData?.username && (
                         <button
                           className="button px-40 py-20 fw-500 -purple-1 text-white"
-                          onClick={() => router.push("/profil-client")} // Redirecționează la pagina principală
+                          onClick={() =>
+                            router.push(withLocalePath(pathname, "/profil-client"))
+                          }
                         >
                           {homePageText}
                         </button>

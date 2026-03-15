@@ -40,7 +40,7 @@ export default function Settings({
     passwordText,
     closeAccountText,
     translatedTexts.activeSubText,
-  ]; // folosește traducerile primite ca props
+  ];
 
   if (loading) {
     return null;

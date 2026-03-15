@@ -110,6 +110,7 @@ export default async function Page({ params }) {
       "Saisissez la réponse personnalisée",
       targetLanguage
     ),
+    metierCustomLabelText: await fetchTranslation("Mon Métier", targetLanguage),
     autreText: await fetchTranslation("Autre", targetLanguage),
     prefereNePasRepondreText: await fetchTranslation(
       "Je préfère ne pas répondre à la question",
