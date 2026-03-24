@@ -1,10 +1,17 @@
 "use client";
 import React from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { withLocalePath } from "@/utils/routeLocale";
 
 export default function CourseCardTwoDash({ data, translatedTexts }) {
+  const pathname = usePathname();
+  const compatibilHref = `${withLocalePath(
+    pathname,
+    "/client-compatibil"
+  )}?uid=${encodeURIComponent(data.id)}`;
   // Verifică dacă `data.images` este definit și este un array
   const mainImage =
     Array.isArray(data.images) && data.images.length > 0
@@ -21,7 +28,7 @@ export default function CourseCardTwoDash({ data, translatedTexts }) {
   return (
     <div className="col-xl-3">
       <a
-        href={`/client-compatibil?uid=${data.id}`}
+        href={compatibilHref}
         className="relative d-block rounded-8 px-10 py-10 border-light"
       >
         <div className="row g-3 align-items-center">

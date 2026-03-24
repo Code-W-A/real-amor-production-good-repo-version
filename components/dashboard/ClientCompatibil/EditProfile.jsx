@@ -9,14 +9,15 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   where,
 } from "firebase/firestore";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { QuizResultsDocument } from "./QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
-import { query } from "firebase/database";
+import { withLocalePath } from "@/utils/routeLocale";
 
 export default function EditProfile({
   activeTab,
@@ -35,6 +36,7 @@ export default function EditProfile({
   });
   const { userData: currentUserData } = useAuth(); // Datele utilizatorului curent
   const router = useRouter();
+  const pathname = usePathname();
 
   // Funcție pentru eliminarea compatibilității
   const handleRemoveCompatibility = async () => {
@@ -78,8 +80,7 @@ export default function EditProfile({
         showAlert: true,
       });
 
-      // Redirecționează utilizatorul la lista compatibilităților
-      router.push("/lista-compatibilitati");
+      router.push(withLocalePath(pathname, "/lista-compatibilitati"));
     } catch (error) {
       console.error("Error removing compatibility:", error);
       setAlertMessage({
@@ -277,7 +278,7 @@ export default function EditProfile({
               className="button -md -purple-1 text-white"
               onClick={(e) => {
                 e.preventDefault();
-                router.push("/chat");
+                router.push(withLocalePath(pathname, "/chat"));
               }}
             >
               <i className="icon-message text-30 mr-10"></i>

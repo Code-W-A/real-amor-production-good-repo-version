@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import AlertBox from "../uiElements/AlertBox";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -10,10 +10,26 @@ import {
   hasValidatedPhoneBundle,
   normalizePhone,
 } from "@/utils/phoneUtils";
+import { withLocalePath } from "@/utils/routeLocale";
+
+/** Same funnel as QuizClient: avoid sending finished users through /quiz → /profil-client. */
+function getPostOnboardingPath(pathname, profile) {
+  if (profile?.reservation?.hasReserved) {
+    return withLocalePath(pathname, "/profil-client");
+  }
+  if (profile?.reservation?.status === "paid") {
+    return withLocalePath(pathname, "/booking");
+  }
+  if (profile?.responses) {
+    return withLocalePath(pathname, "/pricing");
+  }
+  return withLocalePath(pathname, "/quiz");
+}
 
 export default function CompletePhoneForm({ translatedTexts }) {
   const { currentUser, userData, setUserData } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
   const lang = String(params?.lang || "fr").toLowerCase();
   const [phone, setPhone] = useState("");
@@ -33,15 +49,11 @@ export default function CompletePhoneForm({ translatedTexts }) {
     setAlertMessage({ type, content, showAlert: true });
   };
 
-  const redirectToQuiz = () => {
-    router.replace(`/${lang}/quiz`);
-  };
-
   useEffect(() => {
-    if (!currentUser?.uid) return;
+    if (!currentUser?.uid || !pathname) return;
     if (!hasValidatedPhoneBundle(userData)) return;
-    redirectToQuiz();
-  }, [currentUser, userData]);
+    router.replace(getPostOnboardingPath(pathname, userData));
+  }, [currentUser, userData, pathname, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,12 +95,12 @@ export default function CompletePhoneForm({ translatedTexts }) {
         throw new Error(data?.error || translatedTexts.saveErrorText);
       }
 
-      setUserData((prev) => ({
-        ...(prev || {}),
-        ...(data?.phone || {}),
-      }));
+      const merged = { ...(userData || {}), ...(data?.phone || {}) };
+      setUserData(merged);
       showAlert("success", translatedTexts.saveSuccessText);
-      setTimeout(redirectToQuiz, 350);
+      setTimeout(() => {
+        router.replace(getPostOnboardingPath(pathname, merged));
+      }, 350);
     } catch (error) {
       showAlert("danger", error?.message || translatedTexts.saveErrorText);
     } finally {

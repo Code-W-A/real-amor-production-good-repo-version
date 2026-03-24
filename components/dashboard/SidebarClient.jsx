@@ -39,10 +39,15 @@ export default function SidebarClient({ translatedTexts }) {
 
   return (
     <div className="sidebar -dashboard">
-      {translatedSidebarItems.map((elm, i) => (
+      {translatedSidebarItems.map((elm, i) => {
+        const itemHref =
+          elm.id === 8 ? loginPath : withLocalePath(pathname, elm.href || "/");
+        const isActive =
+          pathname === itemHref || pathname.startsWith(`${itemHref}/`);
+        return (
         <div
           key={i}
-          className={`sidebar__item   ${pathname == elm.href ? "-is-active" : ""} `}
+          className={`sidebar__item   ${isActive ? "-is-active" : ""} `}
         >
           {elm.id === 8 ? (
             <a
@@ -62,7 +67,7 @@ export default function SidebarClient({ translatedTexts }) {
             </a>
           ) : (
             <Link
-              href={elm.href || "/"}
+              href={itemHref}
               className="d-flex items-center text-17 lh-1 fw-500 "
             >
               <i className={`${elm.iconClass} mr-15`}></i>
@@ -70,7 +75,8 @@ export default function SidebarClient({ translatedTexts }) {
             </Link>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

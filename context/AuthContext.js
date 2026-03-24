@@ -56,6 +56,7 @@ export const AuthProvider = ({ children }) => {
             console.log(
               "Niciun document găsit pentru acest UID în colecția Users."
             );
+            setUserData(null);
           }
         } catch (error) {
           console.error(
@@ -82,14 +83,18 @@ export const AuthProvider = ({ children }) => {
     // Admin users are excluded from the phone-completion gate.
     if (isAdminUid(currentUser.uid)) return;
 
-    const pathParts = pathname.split("/").filter(Boolean);
-    const locale = pathParts[0] || "fr";
+    // Nu folosi pathParts[0]: pe căi fără prefix (ex. /client-compatibil) primul segment nu e locale
+    const locale = getLocaleFromPathname(pathname);
     const completePhonePath = `/${locale}/complete-phone`;
     const isOnCompletePhonePage =
       pathname === completePhonePath || pathname.startsWith(`${completePhonePath}/`);
+    const clientCompatibilityPath = `/${locale}/client-compatibil`;
+    const isOnClientCompatibilityPage =
+      pathname === clientCompatibilityPath ||
+      pathname.startsWith(`${clientCompatibilityPath}/`);
     const hasPhone = hasValidatedPhoneBundle(userData);
 
-    if (!hasPhone && !isOnCompletePhonePage) {
+    if (!hasPhone && !isOnCompletePhonePage && !isOnClientCompatibilityPage) {
       router.replace(completePhonePath);
     }
   }, [loading, currentUser, userData, pathname, router]);

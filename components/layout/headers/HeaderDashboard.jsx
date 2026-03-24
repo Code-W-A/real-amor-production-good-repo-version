@@ -171,7 +171,10 @@ export default function HeaderDashboard({
                     <Image
                       fill
                       className="object-cover"
-                      src={userData?.images[0]?.fileUri}
+                      src={
+                        userData?.images?.[0]?.fileUri ||
+                        "/assets/img/RealAmorNoTextSVG.svg"
+                      }
                       alt={translatedTexts?.profileImageAltText || "Profile image"}
                     />
                   </a>

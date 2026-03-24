@@ -4,6 +4,8 @@ import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
 import * as XLSX from "xlsx";
 
+export const dynamic = "force-dynamic";
+
 const SUPPORTED_LANGS = new Set(["fr", "nl", "en"]);
 
 const COLUMN_KEYS = [
