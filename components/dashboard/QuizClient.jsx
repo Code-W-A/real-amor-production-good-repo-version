@@ -1,0 +1,1694 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Range } from "react-range"; // Slider pentru valori multiple
+import FooterNine from "../layout/footers/FooterNine";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/firebase";
+import FinishedQuizComp from "../common/FinishQuizComp";
+import { useAuth } from "@/context/AuthContext";
+import {
+  firstQuestions,
+  questionsSet1,
+  questionsSet2,
+  questionsSet3,
+} from "@/data/quiz";
+import QuestionWithApiValidation from "./QuestionWithApiValidation";
+import { prepareResponses } from "@/utils/quizUtils";
+import AlertBox from "../uiElements/AlertBox";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { DotLoader } from "react-spinners";
+import DatePicker from "react-datepicker";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowLeft, faArrowRight } from "@fortawesome/free-solid-svg-icons";
+
+import "react-datepicker/dist/react-datepicker.css";
+import IntroductionQuiz from "./SettingsClient/IntroductionQuiz";
+import EvitaRaspuns from "./EvitaRaspuns";
+import { withLocalePath } from "@/utils/routeLocale";
+import { getQuizDisplayQuestion } from "@/utils/quizDisplay";
+
+const DEV_AUTOFILL =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DEV_QUIZ_AUTOFILL === "true";
+
+const NO_ANSWER_OPTION = "Je préfère ne pas répondre à la question";
+const PURPOSE_COQUINES =
+  "Je cherche des rencontres coquines en toute discrétion.";
+const PURPOSE_AMIS = "Je cherche à élargir mon cercle d’amis.";
+
+const getQuestionSetName = (currentQuestions) => {
+  if (currentQuestions === firstQuestions) return "firstQuestions";
+  if (currentQuestions === questionsSet1) return "questionsSet1";
+  if (currentQuestions === questionsSet2) return "questionsSet2";
+  if (currentQuestions === questionsSet3) return "questionsSet3";
+  return "unknownSet";
+};
+
+function firstStringOption(options = []) {
+  if (!Array.isArray(options)) return null;
+  const strings = options.filter((o) => typeof o === "string");
+  // Avoid forcing paths that need extra input if possible
+  const preferred = strings.find((o) => o !== "autre" && o !== "custom");
+  return preferred || strings[0] || null;
+}
+
+function pickSingleAnswer(question) {
+  const options = question?.options || [];
+  if (Array.isArray(options) && options.includes(NO_ANSWER_OPTION)) {
+    return NO_ANSWER_OPTION;
+  }
+  // image-selection stores the selected image filename
+  if (question?.type === "image-selection") {
+    const first = Array.isArray(options) ? options[0] : null;
+    return typeof first?.image === "string" ? first.image : null;
+  }
+  return firstStringOption(options);
+}
+
+function pickMultipleAnswer(question) {
+  const options = question?.options || [];
+  if (Array.isArray(options) && options.includes(NO_ANSWER_OPTION)) {
+    return [NO_ANSWER_OPTION];
+  }
+  const first = firstStringOption(options);
+  return first ? [first] : [];
+}
+
+function parseDDMMYYYY(str) {
+  if (typeof str !== "string") return null;
+  const m = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) {
+    return null;
+  }
+  const d = new Date(year, month - 1, day);
+  // basic validation (Date will auto-correct invalid dates)
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    return null;
+  }
+  return d;
+}
+
+function computeAgeFromDate(birthDate) {
+  if (!(birthDate instanceof Date)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+  if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return Number.isFinite(age) && age >= 0 && age <= 120 ? age : null;
+}
+
+function buildAutoAnswers(questionSet) {
+  const safeSet = Array.isArray(questionSet) ? questionSet : [];
+  return safeSet.map((q) => {
+    const type = q?.type;
+
+    let answer = null;
+    if (type === "multiple") {
+      answer = pickMultipleAnswer(q);
+    } else if (type === "single" || type === "image-selection") {
+      answer = pickSingleAnswer(q);
+    } else if (type === "input") {
+      // Special-case: postal API question (id: 9) expects "City, postalCode"
+      if (q?.id === 9 || q?.api) {
+        answer = "Bruxelles, 1000";
+      } else if (q?.validation?.type === "number") {
+        // Keep as a string to match typical text input handling
+        answer = "10";
+      } else if (
+        q?.validation?.type === "date" ||
+        String(q?.placeholder || "").includes("JJ/MM/AAAA")
+      ) {
+        // Date of birth input used to compute age in the normal flow
+        answer = "01/01/1990";
+      } else {
+        answer = "Test";
+      }
+    } else if (type === "date-picker") {
+      answer = new Date(1990, 0, 1);
+    } else if (type === "date-range-picker") {
+      answer = {
+        startDate: new Date(1990, 0, 1),
+        endDate: new Date(1990, 0, 2),
+      };
+    } else if (type === "range") {
+      const min = Number.isFinite(Number(q?.validation?.min)) ? Number(q.validation.min) : 0;
+      const max = Number.isFinite(Number(q?.validation?.max)) ? Number(q.validation.max) : 100;
+      answer = q?.singleValue ? min : { min, max };
+    } else {
+      // Fallback for unknown types: prefer no-answer if offered, else first option
+      answer = pickSingleAnswer(q);
+    }
+
+    return { ...q, answer };
+  });
+}
+
+export default function QuizClient({
+  targetLanguage,
+  translatedLinks,
+  params,
+}) {
+  const [currentQuestions, setCurrentQuestions] = useState(firstQuestions);
+  // const [currentQuestions, setCurrentQuestions] = useState(
+  //   targetLanguage === "nl" ? firstQuestionsNL : firstQuestions
+  // );
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  // const [currentQuestions, setCurrentQuestions] = useState(firstQuestions);
+  // const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedOptions, setSelectedOptions] = useState({});
+  const [inputAnswers, setInputAnswers] = useState({});
+  const [rangeValues, setRangeValues] = useState([]);
+
+  const [progress, setProgress] = useState(0);
+  const [quizFinished, setQuizFinished] = useState(false);
+  const {
+    currentUser,
+    loading: loadingContext,
+    userData,
+    setUserData,
+  } = useAuth();
+  const [answers, setAnswers] = useState({
+    firstQuestions,
+    questionsSet1,
+    questionsSet2,
+    questionsSet3,
+  });
+  const [showProgressBar, setShowProgressBar] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(true);
+  const [userAge, setUserAge] = useState(null);
+  const [quizLocationCountry, setQuizLocationCountry] = useState(null);
+  const [selectedDate, setSelectedDate] = useState({});
+  const [selectedDateRange, setSelectedDateRange] = useState({});
+  const searchParams = useSearchParams(); // Utilizăm useSearchParams pentru a obține parametrii URL
+  const isEditQuiz = searchParams?.get("editQuiz"); // Obținem session_id din URL
+  const [showIntroduction, setShowIntroduction] = useState(true);
+  const [devAutofillLoading, setDevAutofillLoading] = useState(false);
+
+  // useEffect(() => {
+  //   if (targetLanguage === "nl") {
+  //     setCurrentQuestions(firstQuestionsNL);
+  //   } else {
+  //     setCurrentQuestions(firstQuestions);
+  //   }
+  // }, [targetLanguage]);
+
+  const resetCurrentQuestionState = () => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+
+    setSelectedOptions((prev) => ({
+      ...prev,
+      [currentQuestion.id]:
+        currentQuestion.type === "multiple" ? [] : undefined,
+    }));
+
+    setInputAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: "",
+    }));
+
+    if (currentQuestion.type === "range") {
+      const min = currentQuestion.validation?.min || 0;
+      const max = currentQuestion.validation?.max || 100;
+
+      setRangeValues(currentQuestion.singleValue ? [min] : [min, max]);
+    }
+
+    setSelectedDate((prev) => ({
+      ...prev,
+      [currentQuestion.id]: null,
+    }));
+
+    setSelectedDateRange((prev) => ({
+      ...prev,
+      [currentQuestion.id]: { startDate: null, endDate: null },
+    }));
+
+    // Elimină selecția „Je préfère ne pas répondre à la question”
+    setSelectedOptions((prev) => ({
+      ...prev,
+      [currentQuestion.id]: [],
+    }));
+  };
+
+  const startQuiz = () => {
+    setShowIntroduction(false);
+  };
+
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleDateChange = (date) => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    console.log("date,,,,", date);
+    setSelectedDate((prev) => ({
+      ...prev,
+      [currentQuestion.id]: date,
+    }));
+  };
+
+  const handleDateRangeChange = (range) => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    setSelectedDateRange((prev) => ({
+      ...prev,
+      [currentQuestion.id]: range,
+    }));
+  };
+
+  useEffect(() => {
+    console.log("targetLanguage...", targetLanguage);
+    console.log("is editing quiz...", isEditQuiz);
+    if (isEditQuiz) {
+      setIsRedirecting(false);
+      return;
+    }
+    if (!loadingContext && !userData?.username) {
+      console.log("no userData...", userData?.username);
+      router.push(withLocalePath(pathname, "/signup"));
+    }
+    // If the user already paid the reservation, never send them back to pricing.
+    if (!loadingContext && userData?.reservation?.hasReserved) {
+      router.push(withLocalePath(pathname, "/profil-client"));
+    } else if (!loadingContext && userData?.reservation?.status === "paid") {
+      router.push(withLocalePath(pathname, "/booking"));
+    } else if (!loadingContext && userData?.responses) {
+      router.push(withLocalePath(pathname, "/pricing"));
+    }
+    setIsRedirecting(false);
+  }, [loadingContext]);
+
+  const saveResponsesToFirestore = async (userId, userAnswers) => {
+    try {
+      // Determină setul activ pe baza răspunsului din `firstQuestions`
+      let activeQuestionSetName = "questionsSet1"; // Default
+      if (
+        userAnswers?.firstQuestions?.[0]?.answer ===
+        "Je cherche des rencontres coquines en toute discrétion."
+      ) {
+        activeQuestionSetName = "questionsSet2";
+      } else if (
+        userAnswers?.firstQuestions?.[0]?.answer ===
+        "Je cherche à élargir mon cercle d’amis."
+      ) {
+        activeQuestionSetName = "questionsSet3";
+      }
+
+      // Construim structura cu `prepareResponses`
+      const allQuestionSets = [
+        { name: "firstQuestions", questions: firstQuestions },
+        {
+          name: activeQuestionSetName,
+          questions:
+            activeQuestionSetName === "questionsSet1"
+              ? questionsSet1
+              : activeQuestionSetName === "questionsSet2"
+              ? questionsSet2
+              : questionsSet3,
+        },
+      ];
+
+      const preparedResponses = prepareResponses(allQuestionSets, userAnswers);
+
+      // Trimite doar `firstQuestions` și setul activ
+      const filteredResponses = {
+        firstQuestions: preparedResponses.firstQuestions,
+        [activeQuestionSetName]: preparedResponses[activeQuestionSetName],
+      };
+
+      console.log(
+        "Debug: Filtered responses to save in Firestore",
+        filteredResponses
+      );
+
+      const payload = { responses: filteredResponses };
+      if (quizLocationCountry) {
+        payload.quizLocationCountry = quizLocationCountry;
+      }
+
+      // Actualizează documentul utilizatorului în Firestore
+      const userDocRef = doc(db, "Users", userId);
+      await updateDoc(userDocRef, payload);
+
+      console.log(
+        "Răspunsurile salvate cu succes în Firestore:",
+        filteredResponses
+      );
+    } catch (error) {
+      console.error("Eroare la salvarea răspunsurilor:", error);
+    }
+  };
+
+  const handleDevAutoComplete = async () => {
+    if (!DEV_AUTOFILL) return;
+    if (!userData?.uid) {
+      setAlertMessage("DEV: user not loaded/authenticated.");
+      setShowAlert(true);
+      return;
+    }
+
+    setDevAutofillLoading(true);
+    try {
+      const autoFirst = buildAutoAnswers(firstQuestions);
+      const purposeAnswer = autoFirst?.[0]?.answer;
+
+      let activeQuestionSetName = "questionsSet1";
+      if (purposeAnswer === PURPOSE_COQUINES) {
+        activeQuestionSetName = "questionsSet2";
+      } else if (purposeAnswer === PURPOSE_AMIS) {
+        activeQuestionSetName = "questionsSet3";
+      }
+
+      const activeSet =
+        activeQuestionSetName === "questionsSet1"
+          ? questionsSet1
+          : activeQuestionSetName === "questionsSet2"
+          ? questionsSet2
+          : questionsSet3;
+
+      const autoActive = buildAutoAnswers(activeSet);
+      const filteredAnswers = {
+        firstQuestions: autoFirst,
+        [activeQuestionSetName]: autoActive,
+      };
+
+      // Compute age from DOB answer when present (same behavior as normal quiz)
+      let age = null;
+      const dobQ = autoActive.find(
+        (q) =>
+          q?.validation?.type === "date" ||
+          String(q?.placeholder || "").includes("JJ/MM/AAAA")
+      );
+      if (typeof dobQ?.answer === "string") {
+        const birthDate = parseDDMMYYYY(dobQ.answer);
+        age = computeAgeFromDate(birthDate);
+      }
+
+      const userDocRef = doc(db, "Users", userData.uid);
+      const dataToSave = { responses: filteredAnswers };
+      if (age !== null) dataToSave.age = age;
+
+      await updateDoc(userDocRef, dataToSave);
+      setUserData((prev) => ({
+        ...(prev || {}),
+        ...dataToSave,
+      }));
+      setQuizFinished(true);
+    } catch (error) {
+      console.error("DEV auto-complete error:", error);
+      setAlertMessage("DEV: Auto-complete failed. Check console.");
+      setShowAlert(true);
+    } finally {
+      setDevAutofillLoading(false);
+    }
+  };
+
+  const handleOptionChange = (option) => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+
+    setSelectedOptions((prev) => {
+      const options = prev[currentQuestion.id] || [];
+
+      // if (currentQuestion.type === "multiple") {
+      //   // Gestionăm opțiunea "custom" pentru multiple
+      //   if (option === "custom") {
+      //     return {
+      //       ...prev,
+      //       [currentQuestion.id]: options.includes("autre")
+      //         ? options // Dacă "custom" este deja selectat, nu facem nimic
+      //         : [...options, "custom"], // Adăugăm "custom" la selecții
+      //     };
+      //   }
+
+      //   // Gestionăm alte opțiuni pentru multiple
+      //   return {
+      //     ...prev,
+      //     [currentQuestion.id]: options.includes(option)
+      //       ? options.filter((o) => o !== option) // Eliminăm opțiunea existentă
+      //       : [...options, option], // Adăugăm opțiunea la selecții
+      //   };
+      // }
+
+      if (currentQuestion.type === "multiple") {
+        // Gestionăm opțiunea "custom" pentru multiple
+        if (option === "custom") {
+          return {
+            ...prev,
+            [currentQuestion.id]: options.includes("autre")
+              ? options // Dacă "custom" este deja selectat, nu facem nimic
+              : [...options, "custom"], // Adăugăm "custom" la selecții
+          };
+        }
+
+        // Eliminăm "Je préfère ne pas répondre à la question" dacă există
+        const filteredOptions = options.filter(
+          (o) => o !== "Je préfère ne pas répondre à la question"
+        );
+
+        // Gestionăm alte opțiuni pentru multiple
+        return {
+          ...prev,
+          [currentQuestion.id]: filteredOptions.includes(option)
+            ? filteredOptions.filter((o) => o !== option) // Eliminăm opțiunea existentă
+            : [...filteredOptions, option], // Adăugăm opțiunea la selecții
+        };
+      }
+
+      if (currentQuestion.type === "single") {
+        // Resetează inputul personalizat dacă altă opțiune decât "autre" este selectată
+        if (option !== "autre") {
+          setInputAnswers((prevInput) => ({
+            ...prevInput,
+            [`autre_${currentQuestion.id}`]: "", // Resetăm valoarea inputului
+          }));
+        }
+      }
+
+      // Gestionăm întrebările de tip single
+      return {
+        ...prev,
+        [currentQuestion.id]: option,
+      };
+    });
+  };
+
+  const handleCustomInputChange = (e) => {
+    const { value } = e.target;
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    const questionId = currentQuestion.id;
+
+    setInputAnswers((prev) => ({
+      ...prev,
+      [`autre_${questionId}`]: value, // Salvează răspunsul personalizat
+    }));
+
+    setSelectedOptions((prev) => {
+      if (currentQuestion.type === "multiple") {
+        // Gestionăm pentru întrebări multiple
+        const updatedOptions = (prev[questionId] || []).filter(
+          (opt) => !opt.startsWith("autre:")
+        );
+        if (value.trim() !== "") {
+          updatedOptions.push(`autre: ${value}`);
+        }
+        console.log("..........", { ...prev, [questionId]: updatedOptions });
+        return { ...prev, [questionId]: updatedOptions };
+      } else {
+        // Gestionăm pentru întrebări single
+        console.log("..........", {
+          ...prev,
+          [questionId]: value.trim() ? `autre: ${value}` : "", // Înlocuiește răspunsul existent
+        });
+        return {
+          ...prev,
+          [questionId]: value.trim() ? `autre: ${value}` : "", // Înlocuiește răspunsul existent
+        };
+      }
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const { value } = e.target;
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    setInputAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: value,
+    }));
+  };
+
+  const validateCurrentAnswer = (currentQuestion) => {
+    console.log("verificare....validate answer", selectedOptions);
+
+    console.log("verificare....currentQuestion", currentQuestion);
+    console.log("verificare....currentQuestion", currentQuestion.type);
+
+    let isValid = false;
+
+    if (
+      selectedOptions[currentQuestion.id]?.includes(
+        "Je préfère ne pas répondre à la question"
+      )
+    ) {
+      isValid = true;
+    } else if (currentQuestion.type === "multiple") {
+      console.log("verificare....multiple", selectedOptions);
+      isValid = selectedOptions[currentQuestion.id]?.length > 0;
+    } else if (
+      currentQuestion.type === "single" ||
+      currentQuestion.type === "image-selection"
+    ) {
+      console.log("verificare....single", selectedOptions);
+      console.log("verificare....single", selectedOptions[currentQuestion.id]);
+      isValid = selectedOptions[currentQuestion.id]?.length > 0;
+    } else if (currentQuestion.type === "input") {
+      console.log("verificare....input", selectedOptions[currentQuestion.id]);
+      isValid = !!inputAnswers[currentQuestion.id]?.trim();
+    } else if (currentQuestion.type === "date-picker") {
+      console.log(
+        "verificare....date-picker",
+        selectedOptions[currentQuestion.id]
+      );
+      isValid = !!selectedDate[currentQuestion.id];
+    } else if (currentQuestion.type === "date-range-picker") {
+      console.log(
+        "verificare....date-range-picker",
+        selectedOptions[currentQuestion.id]
+      );
+      const range = selectedDateRange[currentQuestion.id];
+      isValid = range && range.startDate && range.endDate;
+    } else if (currentQuestion.type === "range") {
+      console.log("verificare....range", selectedOptions[currentQuestion.id]);
+      isValid = true;
+    } else if (currentQuestion.type === "single") {
+      console.log("verificare....single", selectedOptions);
+      isValid = !!selectedOptions;
+    }
+
+    if (!isValid) {
+      setAlertMessage(
+        translatedLinks.answerRequiredBeforeContinueText || translatedLinks.selectedAnswerText
+      );
+      setShowAlert(true);
+    }
+
+    return isValid;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    console.log("userAge...", userAge);
+    console.log("Final selected options:", selectedOptions);
+    console.log("Final input answers:", inputAnswers);
+
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    let selectedAnswer;
+
+    if (!validateCurrentAnswer(currentQuestion)) {
+      console.log("verificare....false");
+      return; // Nu trece mai departe dacă răspunsul nu este valid
+    }
+
+    // Gestionare răspunsuri în funcție de tipul întrebării
+
+    if (
+      selectedOptions[currentQuestion.id]?.includes(
+        "Je préfère ne pas répondre à la question"
+      )
+    ) {
+      selectedAnswer = "Je préfère ne pas répondre à la question";
+    } else if (currentQuestion.type === "date-picker") {
+      selectedAnswer = selectedDate[currentQuestion.id];
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (currentQuestion.type === "date-range-picker") {
+      selectedAnswer = selectedDateRange[currentQuestion.id];
+      if (
+        !selectedAnswer ||
+        !selectedAnswer.startDate ||
+        !selectedAnswer.endDate
+      ) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (currentQuestion.type === "input") {
+      selectedAnswer = inputAnswers[currentQuestion.id];
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (currentQuestion.type === "range") {
+      if (currentQuestion.singleValue) {
+        selectedAnswer = rangeValues[0];
+      } else {
+        selectedAnswer = { min: rangeValues[0], max: rangeValues[1] };
+      }
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (currentQuestion.type === "multiple") {
+      selectedAnswer = selectedOptions[currentQuestion.id] || [];
+      if (selectedAnswer.length === 0) {
+        setAlertMessage(translatedLinks.selectOneOptionText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (selectedOptions[currentQuestion.id] === "autre") {
+      selectedAnswer = inputAnswers[`autre_${currentQuestion.id}`];
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else if (currentQuestion.type === "image-selection") {
+      selectedAnswer = selectedOptions[currentQuestion.id];
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    } else {
+      selectedAnswer = selectedOptions[currentQuestion.id];
+      if (!selectedAnswer) {
+        setAlertMessage(translatedLinks.selectedAnswerText);
+        setShowAlert(true);
+        return;
+      }
+    }
+
+    const questionSetName = getQuestionSetName(currentQuestions);
+
+    // Salvare răspuns în stare pentru întrebarea curentă
+    setAnswers((prev) => ({
+      ...prev,
+      [questionSetName]: (prev[questionSetName] || []).map((q) =>
+        q.id === currentQuestion.id ? { ...q, answer: selectedAnswer } : q
+      ),
+    }));
+
+    // Gestionare consimțământ pentru întrebările din consentFor
+    // if (currentQuestion.consentFor) {
+    //   setAnswers((prev) => ({
+    //     ...prev,
+    //     [questionSetName]: (prev[questionSetName] || []).map((q) =>
+    //       currentQuestion.consentFor.includes(q.id)
+    //         ? { ...q, consent: selectedAnswer === "Oui" } // True dacă răspunsul e "Oui"
+    //         : q
+    //     ),
+    //   }));
+    // }
+
+    // Gestionare condițională pentru întrebări următoare
+    if (currentQuestion.conditionalNext) {
+      const nextQuestionId = currentQuestion.conditionalNext[selectedAnswer];
+      if (nextQuestionId) {
+        const nextQuestionIndex = currentQuestions.findIndex(
+          (q) => q.id === nextQuestionId
+        );
+        if (nextQuestionIndex !== -1) {
+          setCurrentQuestionIndex(nextQuestionIndex);
+          setProgress(
+            ((nextQuestionIndex + 1) / currentQuestions.length) * 100
+          );
+          return;
+        }
+      }
+    }
+
+    // Special-case: după întrebarea "Votre revenu mensuel net..." (26.1),
+    // dacă utilizatorul a selectat la întrebarea 26 că nu are copii,
+    // păstrăm comportamentul existent de a sări peste întrebările despre copii.
+    if (currentQuestion.id === 26.1) {
+      const childrenAnswer = selectedOptions?.[26];
+      if (childrenAnswer === "Je n’ai pas d’enfants.") {
+        const nextQuestionIndex = currentQuestions.findIndex((q) => q.id === 30);
+        if (nextQuestionIndex !== -1) {
+          setCurrentQuestionIndex(nextQuestionIndex);
+          setProgress(((nextQuestionIndex + 1) / currentQuestions.length) * 100);
+          return;
+        }
+      }
+    }
+
+    // Gestionare trecere la următoarea întrebare sau set
+    let nextQuestionIndex = currentQuestionIndex + 1;
+    // Continuă să avansezi până găsești o întrebare care nu are `consentFor`
+    if (currentQuestions[nextQuestionIndex]?.consentFor) {
+      console.log("next q.....");
+      nextQuestionIndex = nextQuestionIndex + 1;
+    }
+
+    if (nextQuestionIndex < currentQuestions.length) {
+      // Continuăm cu următoarea întrebare
+      setCurrentQuestionIndex(nextQuestionIndex);
+      setProgress(((nextQuestionIndex + 1) / currentQuestions.length) * 100);
+    } else if (currentQuestions === firstQuestions) {
+      // Trecem la următorul set în funcție de răspuns
+      const firstQuestionAnswer = selectedOptions[firstQuestions[0].id];
+      if (
+        firstQuestionAnswer ===
+        "Je cherche un(e) partenaire de vie pour une relation sérieuse et stable."
+      ) {
+        setCurrentQuestions(questionsSet1);
+      } else if (
+        firstQuestionAnswer ===
+        "Je cherche des rencontres coquines en toute discrétion."
+      ) {
+        setCurrentQuestions(questionsSet2);
+      } else if (
+        firstQuestionAnswer === "Je cherche à élargir mon cercle d’amis."
+      ) {
+        setCurrentQuestions(questionsSet3);
+      } else {
+        console.error("Răspuns necunoscut la `firstQuestions`.");
+        return;
+      }
+      setCurrentQuestionIndex(0);
+      setShowProgressBar(true);
+      setProgress(0);
+    } else {
+      // Finalizare chestionar
+      if (userData?.uid) {
+        try {
+          const filteredAnswers = {
+            firstQuestions: answers.firstQuestions,
+            [questionSetName]: answers[questionSetName],
+          };
+
+          const userDocRef = doc(db, "Users", userData.uid);
+          const dataToSave = {
+            responses: filteredAnswers,
+          };
+
+          if (userAge !== null) {
+            dataToSave.age = userAge;
+          }
+          let userDb = userData;
+          userDb.responses = filteredAnswers;
+          setUserData(userDb);
+          console.log("dataToSave....", dataToSave);
+          await updateDoc(userDocRef, dataToSave);
+
+          console.log("Răspunsurile salvate cu succes:", filteredAnswers);
+          setQuizFinished(true);
+        } catch (error) {
+          console.error("Eroare la salvarea răspunsurilor:", error);
+        }
+      } else {
+        console.error("Utilizatorul nu este autentificat.");
+      }
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (
+      currentQuestions === firstQuestions &&
+      currentQuestionIndex === currentQuestions.length - 1
+    ) {
+      const selectedAnswer = selectedOptions[1];
+
+      // if (targetLanguage === "nl") {
+      //   switch (selectedAnswer) {
+      //     case "Ik ben op zoek naar een levenspartner voor een serieuze en stabiele relatie.":
+      //       setCurrentQuestions(questionsSet1NL);
+      //       break;
+      //     case "Ik ben op zoek naar discrete spannende ontmoetingen.":
+      //       setCurrentQuestions(questionsSet2NL);
+      //       break;
+      //     case "Ik wil mijn vriendenkring uitbreiden.":
+      //       setCurrentQuestions(questionsSet3NL);
+      //       break;
+      //     default:
+      //       console.error("Onbekend antwoord voor vraag 1");
+      //       return;
+      //   }
+      // } else {
+      switch (selectedAnswer) {
+        case "Je cherche un(e) partenaire de vie pour une relation sérieuse et stable.":
+          setCurrentQuestions(questionsSet1);
+          break;
+        case "Je cherche des rencontres coquines en toute discrétion.":
+          setCurrentQuestions(questionsSet2);
+          break;
+        case "Je cherche à élargir mon cercle d’amis.":
+          setCurrentQuestions(questionsSet3);
+          break;
+        default:
+          console.error("Răspuns necunoscut la întrebarea 1");
+          return;
+      }
+      // }
+
+      setCurrentQuestionIndex(0);
+      setProgress(0);
+      return;
+    }
+
+    const nextQuestionIndex = currentQuestionIndex + 1;
+    if (nextQuestionIndex < currentQuestions.length) {
+      setCurrentQuestionIndex(nextQuestionIndex);
+
+      // Resetează selecțiile pentru următoarea întrebare
+      setSelectedOptions((prev) => ({
+        ...prev,
+        [currentQuestions[nextQuestionIndex]?.id]: [], // Setează un array gol pentru următoarea întrebare
+      }));
+
+      setProgress(((nextQuestionIndex + 1) / currentQuestions.length) * 100);
+      // Resetăm stările vizuale pentru următoarea întrebare
+      resetCurrentQuestionState();
+    } else {
+      if (userData?.uid) {
+        saveResponsesToFirestore(userData.uid, answers, currentQuestions);
+      } else {
+        console.error("Utilizatorul nu este autentificat");
+      }
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setProgress(
+        ((currentQuestionIndex - 1 + 1) / currentQuestions.length) * 100
+      );
+    }
+  };
+
+  const handleValidatedAnswer = (validatedAnswer) => {
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    const questionSetName = getQuestionSetName(currentQuestions);
+
+    // Păstrăm formatul istoric "Ville, CodePostal" pentru locație.
+    if (currentQuestion.api && currentQuestion.type === "input") {
+      const isStructuredLocation =
+        validatedAnswer &&
+        typeof validatedAnswer === "object" &&
+        !Array.isArray(validatedAnswer);
+
+      const postalCode = isStructuredLocation
+        ? validatedAnswer?.postalCode?.trim()
+        : validatedAnswer?.split(",")[0]?.trim();
+      const city = isStructuredLocation
+        ? validatedAnswer?.city?.trim()
+        : validatedAnswer?.split(",")[1]?.trim();
+
+      if (!postalCode || !city) {
+        console.error("Codul poștal sau orașul sunt invalide.");
+        return;
+      }
+
+      if (isStructuredLocation) {
+        setQuizLocationCountry(validatedAnswer.country || null);
+      }
+
+      // Formatăm răspunsul ca string: "city, postalCode"
+      const formattedAnswer = `${city}, ${postalCode}`;
+
+      // Adăugăm răspunsul formatat în answers
+      setAnswers((prev) => ({
+        ...prev,
+        [questionSetName]: (prev[questionSetName] || []).map((q) =>
+          q.id === currentQuestion.id ? { ...q, answer: formattedAnswer } : q
+        ),
+      }));
+
+      handleNextQuestion(); // Trecem la următoarea întrebare
+      return;
+    }
+
+    // Gestionăm cazurile generale
+    setAnswers((prev) => ({
+      ...prev,
+      [questionSetName]: (prev[questionSetName] || []).map((q) =>
+        q.id === currentQuestion.id ? { ...q, answer: validatedAnswer } : q
+      ),
+    }));
+
+    handleNextQuestion(); // Trecem la următoarea întrebare
+  };
+
+  const handleDateInputChange = (e) => {
+    let { value } = e.target;
+    console.log("asdas");
+    // Elimină orice caracter non-numeric sau slash
+    value = value.replace(/[^0-9]/g, "");
+
+    // Adaugă slash-uri automat după fiecare două cifre
+    if (value.length > 2 && value.length <= 4) {
+      value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    } else if (value.length > 4) {
+      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4, 8)}`;
+    }
+
+    // Actualizează starea pentru inputul curent
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    setInputAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: value,
+    }));
+
+    // Dacă data este completă (lungimea este 10), calculăm vârsta
+    if (value.length === 10) {
+      const [day, month, year] = value.split("/").map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const today = new Date();
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+
+      console.log("age...", age);
+      // Validăm vârsta calculată
+      if (!isNaN(age) && age >= 0 && age <= 120) {
+        setUserAge(age); // Setăm vârsta în starea componentelor
+      } else {
+        setUserAge(null); // Resetăm vârsta dacă data este invalidă
+      }
+    } else {
+      setUserAge(null); // Resetăm vârsta dacă data este incompletă
+    }
+  };
+
+  const currentQuestion = currentQuestions[currentQuestionIndex];
+  const currentQuestionSetName = getQuestionSetName(currentQuestions);
+  const displayQuestion = getQuizDisplayQuestion(
+    targetLanguage,
+    currentQuestionSetName,
+    currentQuestion
+  );
+  const displayQuestionText = displayQuestion.text || currentQuestion?.text || "";
+  const displayPlaceholder =
+    displayQuestion && Object.prototype.hasOwnProperty.call(displayQuestion, "placeholder")
+      ? displayQuestion.placeholder
+      : currentQuestion?.placeholder;
+  const getDisplayOptionLabel = (option) => {
+    if (typeof option === "string") {
+      return displayQuestion?.optionLabels?.[option] || option;
+    }
+
+    if (option && typeof option === "object" && typeof option.image === "string") {
+      return displayQuestion?.optionLabels?.[option.image] || option.image;
+    }
+
+    return "";
+  };
+
+  useEffect(() => {
+    const question = currentQuestions[currentQuestionIndex];
+
+    if (question?.type === "range") {
+      const min = question.validation?.min || 30;
+      const max = question.validation?.max || 300;
+
+      // Verificăm și setăm explicit valorile
+      if (question.singleValue) {
+        console.log("Resetting range for single value");
+        setRangeValues([min]); // Slider cu o singură valoare
+      } else {
+        console.log("Resetting range for interval");
+        setRangeValues([min, max]); // Slider cu interval
+      }
+    } else {
+      // Dacă întrebarea nu este de tip range, resetează starea
+      setRangeValues([]);
+    }
+  }, [currentQuestionIndex, currentQuestions]);
+
+  useEffect(() => {
+    resetCurrentQuestionState();
+  }, [currentQuestionIndex]);
+
+  // const resetProgress = () => {
+  //   localStorage.removeItem("quizProgress");
+  //   setCurrentQuestions(firstQuestions);
+  //   setCurrentQuestionIndex(0);
+  //   setSelectedOptions({});
+  //   setInputAnswers({});
+  //   setProgress(0);
+  // };
+
+  if (quizFinished && isEditQuiz) {
+    router.push(withLocalePath(pathname, "/profil-client"));
+  }
+  if (quizFinished && !isEditQuiz) {
+    router.push(withLocalePath(pathname, "/pricing"));
+    return <FinishedQuizComp translatedLinks={translatedLinks} />;
+  }
+
+  if (isRedirecting) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <DotLoader color="#c13365" size={60} />
+      </div>
+    );
+  }
+
+  if (showIntroduction) {
+    return (
+      <>
+        {DEV_AUTOFILL && (
+          <div style={{ padding: 16 }}>
+            <button
+              type="button"
+              onClick={handleDevAutoComplete}
+              className="button -sm -purple-1 text-white"
+              disabled={devAutofillLoading}
+            >
+              {devAutofillLoading
+                ? "DEV: Auto-completing..."
+                : "DEV: Auto-complete quiz"}
+            </button>
+          </div>
+        )}
+        <IntroductionQuiz onStart={startQuiz} translatedLinks={translatedLinks} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="dashboard__main pl-0">
+        <div className="dashboard__content bg-light-4 pt-20">
+          {/* <div className="row pb-20 mb-10">
+            <div className="col-auto">
+              <h1 className="text-30 lh-12 fw-700">Chestionar</h1>
+            </div>
+          </div> */}
+
+          <div className="row y-gap-30">
+            <div className={showProgressBar ? "col-xl-9" : "col-xl-12"}>
+              <div className="rounded-16 bg-white -dark-bg-dark-1 shadow-4">
+                <div className="py-30 px-30">
+                  <div className="row pb-20 mb-10">
+                    <div className="col-auto">
+                      <h1 className="text-30 lh-12 fw-700">
+                        {translatedLinks.chestionarText}
+                      </h1>
+                    </div>
+                    {DEV_AUTOFILL && (
+                      <div className="col-auto ml-auto">
+                        <button
+                          type="button"
+                          onClick={handleDevAutoComplete}
+                          className="button -sm -purple-1 text-white"
+                          disabled={devAutofillLoading}
+                        >
+                          {devAutofillLoading
+                            ? "DEV: Auto-completing..."
+                            : "DEV: Auto-complete"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-light overflow-hidden rounded-8">
+                    <div className="py-40 px-40 bg-dark-5">
+                      {/* <h4 className="text-18 lh-1 fw-500 text-white">
+                        {translatedLinks.întrebareaText} {currentQuestion.id}
+                      </h4> */}
+                      <div className="text-20 lh-1 text-white mt-15">
+                        {displayQuestionText}{" "}
+                        {/* Tradus sau fallback */}
+                      </div>
+                    </div>
+
+                    <div className="px-40 py-40">
+                      {currentQuestion.type === "date-picker" ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              <label>{displayQuestionText}</label>
+                              <DatePicker
+                                selected={
+                                  selectedDate[currentQuestion.id] || null
+                                }
+                                onChange={(date) => handleDateChange(date)}
+                                showMonthYearPicker
+                                dateFormat="MM/yyyy"
+                                placeholderText={
+                                  typeof displayPlaceholder === "string"
+                                    ? displayPlaceholder
+                                    : currentQuestion.placeholder
+                                }
+                                className="form-control"
+                              />
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex !== 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                                disabled={!selectedDate[currentQuestion.id]}
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.type === "date-range-picker" ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              <label>{displayQuestionText}</label>
+                              <DatePicker
+                                selected={
+                                  selectedDateRange[currentQuestion.id]
+                                    ?.startDate || null
+                                }
+                                onChange={(dates) => {
+                                  const [start, end] = dates;
+                                  handleDateRangeChange({
+                                    startDate: start,
+                                    endDate: end,
+                                  });
+                                }}
+                                startDate={
+                                  selectedDateRange[currentQuestion.id]
+                                    ?.startDate || null
+                                }
+                                endDate={
+                                  selectedDateRange[currentQuestion.id]
+                                    ?.endDate || null
+                                }
+                                selectsRange
+                                dateFormat="MM/yyyy"
+                                placeholderText={
+                                  typeof displayPlaceholder === "string"
+                                    ? displayPlaceholder
+                                    : currentQuestion.placeholder
+                                }
+                                className="form-control"
+                              />
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex !== 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                                disabled={
+                                  !selectedDateRange[currentQuestion.id]
+                                    ?.startDate ||
+                                  !selectedDateRange[currentQuestion.id]
+                                    ?.endDate
+                                }
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.type === "image-selection" ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="image-selection-container">
+                              {currentQuestion.options.map((option, index) => (
+                                <div
+                                  key={index}
+                                  className={`image-option ${
+                                    selectedOptions[currentQuestion.id] ===
+                                    option.image
+                                      ? "selected"
+                                      : ""
+                                  }`}
+                                  onClick={() =>
+                                    setSelectedOptions((prev) => ({
+                                      ...prev,
+                                      [currentQuestion.id]: option.image,
+                                    }))
+                                  }
+                                >
+                                  <img
+                                    src={`/assets/img/${option.image}`}
+                                    alt={`Option ${index + 1}`}
+                                    className="image-thumbnail"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex !== 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                                disabled={!selectedOptions[currentQuestion.id]}
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.type === "input" &&
+                        !currentQuestion.api &&
+                        currentQuestion.validation?.type !== "date" ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              <input
+                                type="text"
+                                placeholder={
+                                  typeof displayPlaceholder === "string"
+                                    ? displayPlaceholder
+                                    : currentQuestion.placeholder
+                                }
+                                value={inputAnswers[currentQuestion.id] || ""}
+                                onChange={handleInputChange}
+                                className="form-control custom-input"
+                              />
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex != 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                  disabled={currentQuestionIndex === 0}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.type === "range" &&
+                        currentQuestion.singleValue ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              {/* Slider pentru o singură valoare */}
+                              <Range
+                                step={1}
+                                min={currentQuestion.validation.min}
+                                max={currentQuestion.validation.max}
+                                values={rangeValues}
+                                onChange={(values) => setRangeValues(values)}
+                                renderTrack={({ props, children }) => (
+                                  <div
+                                    {...props}
+                                    className="range-track"
+                                    style={{
+                                      height: "6px",
+                                      background: "#ddd",
+                                      borderRadius: "3px",
+                                    }}
+                                  >
+                                    {children}
+                                  </div>
+                                )}
+                                renderThumb={({ props, value }) => (
+                                  <div
+                                    {...props}
+                                    className="range-thumb"
+                                    style={{
+                                      height: "20px",
+                                      width: "20px",
+                                      background: "#6c63ff",
+                                      borderRadius: "50%",
+                                      outline: "none",
+                                    }}
+                                  >
+                                    <div className="value-tooltip">{value}</div>
+                                  </div>
+                                )}
+                              />
+                              <div className="range-labels">
+                                <span>{rangeValues[0]}</span>
+                              </div>
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex !== 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                  disabled={currentQuestionIndex === 0}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.type === "range" &&
+                        !currentQuestion.singleValue ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              {/* Slider pentru interval */}
+                              <Range
+                                step={1}
+                                min={currentQuestion.validation.min}
+                                max={currentQuestion.validation.max}
+                                values={rangeValues}
+                                onChange={(values) => setRangeValues(values)} // Actualizează ambele valori direct
+                                renderTrack={({ props, children }) => (
+                                  <div
+                                    {...props}
+                                    className="range-track"
+                                    style={{
+                                      height: "6px",
+                                      background: "#ddd",
+                                      borderRadius: "3px",
+                                    }}
+                                  >
+                                    {children}
+                                  </div>
+                                )}
+                                renderThumb={({ props, value, index }) => (
+                                  <div
+                                    {...props}
+                                    className="range-thumb"
+                                    style={{
+                                      height: "20px",
+                                      width: "20px",
+                                      background: "#6c63ff",
+                                      borderRadius: "50%",
+                                      outline: "none",
+                                    }}
+                                  >
+                                    <div className="value-tooltip">{value}</div>
+                                  </div>
+                                )}
+                              />
+                              <div className="range-labels">
+                                <span>{rangeValues[0]}</span>
+                                <span>{rangeValues[1]}</span>
+                              </div>
+                            </div>
+
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex !== 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                  disabled={currentQuestionIndex === 0}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : currentQuestion.api &&
+                        currentQuestion.type === "input" ? (
+                        <>
+                          <QuestionWithApiValidation
+                            question={currentQuestion}
+                            onValidatedAnswer={handleValidatedAnswer}
+                            translatedLinks={translatedLinks}
+                            displayLabel={displayQuestionText}
+                            displayPlaceholder={
+                              typeof displayPlaceholder === "string"
+                                ? displayPlaceholder
+                                : currentQuestion.placeholder
+                            }
+                          />
+                        </>
+                      ) : currentQuestion.validation?.type === "date" ? (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                              <input
+                                type="text"
+                                placeholder={
+                                  (typeof displayPlaceholder === "string"
+                                    ? displayPlaceholder
+                                    : currentQuestion.placeholder) || "JJ/MM/AAAA"
+                                }
+                                value={inputAnswers[currentQuestion.id] || ""}
+                                onChange={handleDateInputChange} // Utilizarea funcției pentru gestionarea formatării
+                                className="form-control custom-input"
+                                maxLength={10} // Limitează lungimea la 10 caractere (dd/MM/yyyy)
+                              />
+                            </div>
+                            <EvitaRaspuns
+                              selectedOptions={selectedOptions}
+                              currentQuestion={currentQuestion}
+                              setSelectedOptions={setSelectedOptions}
+                              translatedLinks={translatedLinks}
+                            />
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex != 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                  disabled={currentQuestionIndex === 0}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      ) : (
+                        <>
+                          <form onSubmit={handleSubmit}>
+                            {/* Mapare opțiuni */}
+                            {currentQuestion.options?.map((option, index) => (
+                              <div
+                                key={index}
+                                className="form-radio d-flex items-center mt-20"
+                              >
+                                <div className="radio">
+                                  <input
+                                    type={
+                                      currentQuestion.type === "multiple"
+                                        ? "checkbox"
+                                        : "radio"
+                                    }
+                                    value={option}
+                                    checked={
+                                      currentQuestion.type === "multiple"
+                                        ? selectedOptions[
+                                            currentQuestion.id
+                                          ]?.includes(option)
+                                        : selectedOptions[
+                                            currentQuestion.id
+                                          ] === option
+                                    }
+                                    onChange={() => handleOptionChange(option)}
+                                  />
+                                  <div className="radio__mark">
+                                    <div className="radio__icon"></div>
+                                  </div>
+                                </div>
+                                <div className="fw-500 ml-12">
+                                  {getDisplayOptionLabel(option)}
+                                </div>
+                              </div>
+                            ))}
+
+                            {currentQuestions.length != 4 && (
+                              <EvitaRaspuns
+                                selectedOptions={selectedOptions}
+                                currentQuestion={currentQuestion}
+                                setSelectedOptions={setSelectedOptions}
+                                translatedLinks={translatedLinks}
+                              />
+                            )}
+                            {/* Afișăm câmpul input pentru "Autre" */}
+                            {/* Input pentru "Autre" */}
+
+                            {/* Afișăm câmpul input pentru "Autre" dacă allowsCustom este true */}
+                            {currentQuestion.allowsCustom && (
+                              <div className="form-group mt-20">
+                                <h3>
+                                  {currentQuestion.text === "Quel est votre métier ?"
+                                    ? translatedLinks.metierCustomLabelText
+                                    : translatedLinks.autreText}
+                                </h3>
+                                <input
+                                  type="text"
+                                  placeholder={
+                                    translatedLinks.raspunsPersonalizatText
+                                  }
+                                  value={
+                                    inputAnswers[
+                                      `autre_${currentQuestion.id}`
+                                    ] || ""
+                                  }
+                                  onChange={handleCustomInputChange}
+                                  className="form-control custom-input"
+                                />
+                              </div>
+                            )}
+
+                            {/* Afișăm câmpul input pentru "Autre" */}
+
+                            <div className="d-flex justify-end">
+                              {currentQuestionIndex != 0 && (
+                                <button
+                                  type="button"
+                                  className="button -md -dark-1 text-white -dark-button-white mt-40 mr-10"
+                                  onClick={handlePreviousQuestion}
+                                  disabled={currentQuestionIndex === 0}
+                                >
+                                  <FontAwesomeIcon icon={faArrowLeft} />{" "}
+                                  {/* Sageata inapoi */}
+                                </button>
+                              )}
+                              <button
+                                type="submit"
+                                className="button -md -dark-1 text-white -dark-button-white mt-40"
+                              >
+                                <FontAwesomeIcon icon={faArrowRight} />{" "}
+                                {/* Sageata urmator */}
+                              </button>
+                            </div>
+                          </form>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="d-flex justify-between items-center mt-40"></div>
+              </div>
+            </div>
+
+            {showProgressBar && (
+              <div className="col-xl-3 col-lg-3">
+                <div className="row y-gap-30">
+                  <div className="col-12">
+                    <div className="pt-20 pb-30 px-30 rounded-16 bg-white -dark-bg-dark-1 shadow-4">
+                      <h5 className="text-17 fw-500 mb-30">
+                        {translatedLinks.progresText}
+                      </h5>
+                      <div className="d-flex items-center">
+                        <div className="progress-bar w-1/1">
+                          <div className="progress-bar__bg bg-light-3"></div>
+                          <div
+                            className="progress-bar__bar bg-purple-1"
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                        <div className="d-flex y-gap-10 justify-between items-center ml-15">
+                          <div>{progress.toFixed(0)}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <FooterNine />
+      </div>
+      {showAlert && (
+        <AlertBox
+          type="danger"
+          message={alertMessage}
+          showAlert={showAlert}
+          onClose={() => setShowAlert(false)}
+        />
+      )}
+    </>
+  );
+}

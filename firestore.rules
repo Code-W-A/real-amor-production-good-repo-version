@@ -1,0 +1,177 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isString(x) {
+      return x is string;
+    }
+
+    function isValidSessionId(x) {
+      // Stripe Checkout Session IDs look like: cs_test_..., cs_live_...
+      return isString(x) && x.matches('^cs_[A-Za-z0-9_]+$');
+    }
+
+    function isValidSubscriptionId(x) {
+      // Stripe subscription IDs look like: sub_...
+      return isString(x) && x.matches('^sub_[A-Za-z0-9_]+$');
+    }
+
+    function adminUids() {
+      return get(/databases/$(database)/documents/Config/AdminUids).data.uids;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/Config/AdminUids) &&
+        (adminUids() is list) &&
+        adminUids().hasAny([request.auth.uid]);
+    }
+
+    function paymentsAppendOnly(prev, next) {
+      // Allow missing payments on either side
+      return !(prev is map) || !(next is map) ||
+        !('processedSessionIds' in prev) || !('processedSessionIds' in next) ||
+        (
+          next.processedSessionIds is list &&
+          prev.processedSessionIds is list &&
+          next.processedSessionIds.size() >= prev.processedSessionIds.size() &&
+          next.processedSessionIds.hasAll(prev.processedSessionIds)
+        );
+    }
+
+    function validPaymentsShape(prev, next) {
+      // If payments not present, don't block unrelated updates.
+      return !(next is map) ||
+        (
+          // processedSessionIds must be a list if present
+          !('processedSessionIds' in next) || (next.processedSessionIds is list)
+        ) &&
+        (
+          // lastProcessedSessionId must look like Stripe session id if present
+          !('lastProcessedSessionId' in next) || isValidSessionId(next.lastProcessedSessionId)
+        ) &&
+        (
+          // If both lastProcessedSessionId and processedSessionIds exist, last must be in the list
+          !('lastProcessedSessionId' in next) ||
+          !('processedSessionIds' in next) ||
+          next.processedSessionIds.hasAny([next.lastProcessedSessionId])
+        ) &&
+        (
+          // Ensure array only grows (no deletions)
+          paymentsAppendOnly(prev, next)
+        );
+    }
+
+    match /Config/AdminUids {
+      // Do not expose the admin list to clients.
+      allow read, write: if false;
+    }
+
+    match /Config/{docId} {
+      // Promo config is read client-side
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /DeletedUsers/{docId} {
+      // Only admins can read deleted users.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /Users/{userId} {
+      // Many screens query/browse users; keep reads for signed-in users.
+      allow read: if isSignedIn();
+
+      allow create: if isOwner(userId);
+
+      allow update: if isOwner(userId) &&
+        validPaymentsShape(resource.data.payments, request.resource.data.payments) &&
+        (
+          // Basic format guards if these fields are written
+          !('subscriptionId' in request.resource.data) || request.resource.data.subscriptionId == null || isValidSubscriptionId(request.resource.data.subscriptionId)
+        ) &&
+        (
+          !('lifetimeSessionId' in request.resource.data) || request.resource.data.lifetimeSessionId == null || isValidSessionId(request.resource.data.lifetimeSessionId)
+        ) &&
+        (
+          !('reservation' in request.resource.data) ||
+          !('sessionId' in request.resource.data.reservation) ||
+          request.resource.data.reservation.sessionId == null ||
+          isValidSessionId(request.resource.data.reservation.sessionId)
+        ) &&
+        (
+          // Best-effort monotonic: once subscriptionActive becomes true, don't allow turning it off from client
+          !('subscriptionActive' in request.resource.data) ||
+          (resource.data.subscriptionActive == true ? request.resource.data.subscriptionActive == true : true)
+        );
+
+      allow delete: if isOwner(userId);
+
+      // Subcollections under a user document
+      match /{subcollection}/{docId} {
+        allow read: if isSignedIn();
+
+        // Owner can manage their subcollections as before
+        allow create, update: if isOwner(userId);
+
+        // Deletes: owner OR special-case allowing a user to remove themselves
+        // from another user's Compatibilitati subcollection.
+        allow delete: if isOwner(userId) ||
+          (
+            isSignedIn() &&
+            subcollection == "Compatibilitati" &&
+            resource.data.compatibleUserId == request.auth.uid
+          );
+      }
+    }
+
+    match /Judete/{judetId} {
+      // Used for location lists (judete/localitati)
+      allow read: if true;
+      allow write: if false;
+
+      match /{subcollection}/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    function isChatParticipant(chatId) {
+      return isSignedIn() &&
+        chatId.split('-').size() == 2 &&
+        chatId.split('-').hasAny([request.auth.uid]);
+    }
+
+    match /Chats/{chatId} {
+      allow read: if isChatParticipant(chatId);
+      allow write: if false;
+
+      match /Messages/{messageId} {
+        allow read: if isChatParticipant(chatId);
+        allow create: if isChatParticipant(chatId) &&
+          request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isChatParticipant(chatId) &&
+          resource.data.senderId == request.auth.uid;
+      }
+
+      match /Typing/{docId} {
+        allow read, write: if isChatParticipant(chatId);
+      }
+    }
+
+    // Default: do not allow access to unknown top-level collections.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
