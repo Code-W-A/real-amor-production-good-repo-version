@@ -20,7 +20,10 @@ export default async function Page({ params }) {
       <div className="content-wrapper js-content-wrapper overflow-hidden">
         <section className="form-page js-mouse-move-container">
           <AuthImageMove />
-          <CompletePhoneForm translatedTexts={translatedTexts} />
+          <CompletePhoneForm
+            translatedTexts={translatedTexts}
+            locale={targetLanguage}
+          />
         </section>
       </div>
     </div>

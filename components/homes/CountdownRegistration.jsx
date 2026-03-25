@@ -1,6 +1,18 @@
 "use client";
 import React, { useRef, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import PasswordInput from "@/components/uiElements/PasswordInput";
+import { getMessages } from "@/i18n";
+import { getLocaleFromPathname } from "@/utils/routeLocale";
+
 export default function CountdownRegistration() {
+  const pathname = usePathname();
+  const lang = getLocaleFromPathname(pathname);
+  const { passwordShowAriaLabel, passwordHideAriaLabel } = getMessages(
+    lang,
+    "common"
+  );
+  const [password, setPassword] = useState("");
   const [timerDays, setTimerDays] = useState("00");
   const [timerHours, setTimerHours] = useState("00");
   const [timerMinutes, setTimerMinutes] = useState("00");
@@ -73,11 +85,15 @@ export default function CountdownRegistration() {
                     <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                       Password
                     </label>
-                    <input
+                    <PasswordInput
                       required
-                      type="password"
                       name="password"
                       placeholder="Password..."
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="new-password"
+                      showPasswordLabel={passwordShowAriaLabel}
+                      hidePasswordLabel={passwordHideAriaLabel}
                     />
                   </div>
                   <div className="col-12">

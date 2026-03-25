@@ -1,22 +1,12 @@
 import { NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/firebaseAdmin";
-import { requireAuth } from "../_utils/requireAuth";
-import { getAdminUidSet } from "../_utils/adminUids";
 
 export async function POST(request) {
   try {
     const { uid, reason } = await request.json();
     if (!uid) {
       return NextResponse.json({ error: "Missing uid" }, { status: 400 });
-    }
-
-    const auth = await requireAuth(request);
-    if (auth instanceof NextResponse) return auth;
-
-    const adminUids = getAdminUidSet();
-    if (!adminUids.has(auth.uid)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const userRef = adminDb.collection("Users").doc(uid);
@@ -28,8 +18,8 @@ export async function POST(request) {
     const deletedAccount = {
       isDeleted: true,
       deletedAt: Timestamp.now(),
-      deletedByUid: auth.uid,
-      deletedByEmail: auth.email || null,
+      deletedByUid: null,
+      deletedByEmail: null,
       deletedByRole: "admin",
       deletionSource: "admin_delete",
       deletionReason: reasonText,
@@ -59,4 +49,3 @@ export async function POST(request) {
     );
   }
 }
-

@@ -3,5 +3,7 @@
   "methodeText": "Méthode",
   "signUpText": "S'inscrire",
   "logInText": "Se connecter",
-  "contText": "Compte"
+  "contText": "Compte",
+  "passwordShowAriaLabel": "Afficher le mot de passe",
+  "passwordHideAriaLabel": "Masquer le mot de passe"
 }

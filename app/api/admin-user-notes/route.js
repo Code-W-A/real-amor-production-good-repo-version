@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/firebaseAdmin";
-import { requireAuth } from "../_utils/requireAuth";
-import { getAdminUidSet } from "../_utils/adminUids";
 
 const COLLECTION = "AdminUserNotes"; // Not accessible from client SDK (blocked by firestore.rules default deny)
 const MAX_LEN = 10000;
@@ -12,15 +10,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const uid = searchParams.get("uid");
     if (!uid) {
-      return NextResponse.json({ error: "Missing uid" }, { status: 400 });
-    }
-
-    const auth = await requireAuth(request);
-    if (auth instanceof NextResponse) return auth;
-
-    const adminUids = getAdminUidSet();
-    if (!adminUids.has(auth.uid)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      console.warn("[admin-user-notes GET] missing uid");
+      return NextResponse.json(
+        { error: "Missing uid", code: "MISSING_UID" },
+        { status: 400 }
+      );
     }
 
     const ref = adminDb.collection(COLLECTION).doc(uid);
@@ -37,27 +31,39 @@ export async function GET(request) {
       { status: 200 }
     );
   } catch (err) {
-    console.error("admin-user-notes GET error:", err);
+    console.error("[admin-user-notes GET] error:", err?.message || err, {
+      stack: err?.stack,
+    });
     return NextResponse.json(
-      { error: err?.message || "Internal Server Error" },
+      {
+        error: err?.message || "Internal Server Error",
+        code: "GET_FAILED",
+      },
       { status: 500 }
     );
   }
 }
 
 export async function POST(request) {
+  let body;
   try {
-    const { uid, notes } = await request.json();
+    body = await request.json();
+  } catch (parseErr) {
+    console.warn("[admin-user-notes POST] invalid JSON body", parseErr?.message);
+    return NextResponse.json(
+      { error: "Invalid JSON body", code: "INVALID_JSON" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const { uid, notes } = body || {};
     if (!uid) {
-      return NextResponse.json({ error: "Missing uid" }, { status: 400 });
-    }
-
-    const auth = await requireAuth(request);
-    if (auth instanceof NextResponse) return auth;
-
-    const adminUids = getAdminUidSet();
-    if (!adminUids.has(auth.uid)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      console.warn("[admin-user-notes POST] missing uid");
+      return NextResponse.json(
+        { error: "Missing uid", code: "MISSING_UID" },
+        { status: 400 }
+      );
     }
 
     const safeNotes = String(notes || "").slice(0, MAX_LEN);
@@ -66,18 +72,27 @@ export async function POST(request) {
       {
         notes: safeNotes,
         updatedAt: Timestamp.now(),
-        updatedBy: auth.uid,
+        updatedBy: null,
       },
       { merge: true }
     );
 
+    console.log("[admin-user-notes POST] saved", {
+      uid,
+      notesLength: safeNotes.length,
+    });
+
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {
-    console.error("admin-user-notes POST error:", err);
+    console.error("[admin-user-notes POST] error:", err?.message || err, {
+      stack: err?.stack,
+    });
     return NextResponse.json(
-      { error: err?.message || "Internal Server Error" },
+      {
+        error: err?.message || "Internal Server Error",
+        code: "SAVE_FAILED",
+      },
       { status: 500 }
     );
   }
 }
-

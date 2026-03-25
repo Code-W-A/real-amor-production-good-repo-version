@@ -12,6 +12,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { collection, getDoc, getDocs, doc } from "firebase/firestore";
 import { db } from "@/firebase";
 import ListCompatibilitati from "../DashBoardCards/ListaCompatibilitatiComp";
+import {
+  extractGenderSeekingWithProfileFallback,
+  areRomanticGenderSeekingCompatible,
+  isDemographicGenderOrSeekingQuestionText,
+} from "@/utils/compatibilityGenderGate";
 
 const buttons = [
   "Edit Profile",
@@ -24,6 +29,8 @@ const buttons = [
 export default function Settings({ translatedTexts }) {
   const [users, setUsers] = useState([]);
   const [currentUserResponses, setCurrentUserResponses] = useState({});
+  /** Fallback when quiz gender answer is missing; maps male/female → Homme/Femme only. */
+  const [currentUserProfileGender, setCurrentUserProfileGender] = useState(null);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(5);
@@ -39,7 +46,12 @@ export default function Settings({ translatedTexts }) {
         // Obține datele utilizatorului curent
         const currentUserDoc = await getDoc(doc(db, "Users", uid));
         if (currentUserDoc.exists()) {
-          setCurrentUserResponses(currentUserDoc.data().responses || {});
+          const data = currentUserDoc.data();
+          setCurrentUserResponses(data.responses || {});
+          setCurrentUserProfileGender(data.gender ?? null);
+        } else {
+          setCurrentUserResponses({});
+          setCurrentUserProfileGender(null);
         }
 
         // Obține lista altor utilizatori
@@ -64,17 +76,19 @@ export default function Settings({ translatedTexts }) {
 
   // Filtrare utilizatori pe baza termenului de căutare
   useEffect(() => {
+    const term = searchTerm.toLowerCase();
     const filtered = users.filter((user) =>
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
+      String(user.username || "")
+        .toLowerCase()
+        .includes(term)
     );
     setFilteredUsers(filtered);
     setCurrentPage(1);
   }, [searchTerm, users]);
 
-  // Calculează utilizatorii care trebuie afișați pe pagina curentă
+  // Paginare pentru lista de compatibilități (slice aplicat pe `paginatedCompatibleUsers` mai jos)
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
   // Funcție de schimbare a paginii
   const paginate = (pageNumber) => {
@@ -163,7 +177,7 @@ export default function Settings({ translatedTexts }) {
   //   };
   // };
 
-  const calculateCompatibility = (userResponses) => {
+  const calculateCompatibility = (userResponses, otherUserProfileGender) => {
     const currentResponses = currentUserResponses || {};
 
     const questionSets = [
@@ -258,45 +272,26 @@ export default function Settings({ translatedTexts }) {
       return false;
     };
 
-    // Funcție actualizată pentru a căuta întrebările folosind expresii regulate
-    const getAnswerByText = (responses, regex) => {
-      for (const set of questionSets) {
-        const question = responses[set]?.find((q) =>
-          regex.test(q.text.trim().toLowerCase())
-        );
-        if (question?.answer) {
-          return question.answer;
-        }
-      }
+    const currentPack = extractGenderSeekingWithProfileFallback(
+      currentResponses,
+      currentUserProfileGender
+    );
+    const userPack = extractGenderSeekingWithProfileFallback(
+      userResponses,
+      otherUserProfileGender
+    );
+
+    if (
+      !currentPack.complete ||
+      !userPack.complete ||
+      !areRomanticGenderSeekingCompatible(
+        currentPack.myGender,
+        currentPack.mySeeking,
+        userPack.myGender,
+        userPack.mySeeking
+      )
+    ) {
       return null;
-    };
-
-    // Expresii regulate pentru întrebările dorite
-    const genderRegex = /etes-vous/i;
-    const searchRegex = /cherchez-vous/i;
-
-    const currentGender = getAnswerByText(currentResponses, genderRegex);
-    const currentSearch = getAnswerByText(currentResponses, searchRegex);
-    const userGender = getAnswerByText(userResponses, genderRegex);
-    const userSearch = getAnswerByText(userResponses, searchRegex);
-
-    console.log("currentGender", currentGender);
-    console.log("currentSearch", currentSearch);
-    console.log("userGender", userGender);
-    console.log("userSearch", userSearch);
-
-    // Verificăm compatibilitatea pe baza genului
-    const genderCompatibility =
-      currentSearch &&
-      userGender &&
-      currentSearch.includes(userGender) &&
-      userSearch &&
-      currentGender &&
-      userSearch.includes(currentGender);
-
-    if (!genderCompatibility) {
-      console.log("Genuri incompatibile");
-      return null; // Dacă genurile nu sunt compatibile, returnăm null
     }
 
     // Verificăm dacă prima întrebare din `firstQuestions` are aceeași valoare pentru `answer`
@@ -343,8 +338,8 @@ export default function Settings({ translatedTexts }) {
             const a = currentQuestion?.answer;
             const b = matchedQuestion?.answer;
 
-            // Gender + seeking questions: already gated by genderCompatibility, so consider them compatible
-            if (qText.includes("etes-vous") || qText.includes("cherchez-vous")) {
+            // Demographic gender / Cherchez-vous: gated above; do not penalize score for expected differences
+            if (isDemographicGenderOrSeekingQuestionText(currentQuestion?.text)) {
               isCompatible = true;
             }
 
@@ -452,20 +447,33 @@ export default function Settings({ translatedTexts }) {
     };
   };
 
-  const compatibleUsers = users
-    .filter((user) => user.responses) // Filtrează utilizatorii care au `responses`
+  const compatibleUsers = filteredUsers
+    .filter((user) => user.responses)
     .map((user) => ({
       ...user,
-      compatibility: calculateCompatibility(user.responses),
+      compatibility: calculateCompatibility(user.responses, user.gender),
     }))
-    .filter((user) => user.compatibility !== null) // Exclude utilizatorii incompatibili
+    .filter((user) => user.compatibility !== null)
     .sort(
       (a, b) =>
         b.compatibility.compatibilityScore - a.compatibility.compatibilityScore
     );
 
+  useEffect(() => {
+    const maxP = Math.max(
+      1,
+      Math.ceil(compatibleUsers.length / usersPerPage) || 1
+    );
+    setCurrentPage((p) => Math.min(Math.max(1, p), maxP));
+  }, [compatibleUsers.length, usersPerPage]);
+
+  const paginatedCompatibleUsers = compatibleUsers.slice(
+    indexOfFirstUser,
+    indexOfLastUser
+  );
+
   return (
-    <div className="dashboard__main">
+    <>
       <div className="dashboard__content bg-light-4">
         <div className="row y-gap-30">
           <div className="col-12">
@@ -495,7 +503,12 @@ export default function Settings({ translatedTexts }) {
                       translatedTexts={translatedTexts}
                     />
                   )}
-                  {activeTab === 2 && <Password />}
+                  {activeTab === 2 && (
+                    <Password
+                      activeTab={activeTab}
+                      translatedTexts={translatedTexts}
+                    />
+                  )}
                   {activeTab === 3 && <SocialProfiles />}
                   {activeTab === 4 && <Notification />}
                   {activeTab === 5 && <CloseAccount />}
@@ -526,7 +539,7 @@ export default function Settings({ translatedTexts }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {compatibleUsers.map((user) => (
+                          {paginatedCompatibleUsers.map((user) => (
                             <ListCompatibilitati
                               data={user}
                               key={user.id}
@@ -546,7 +559,7 @@ export default function Settings({ translatedTexts }) {
                       <div className="col-auto">
                         <Pagination
                           usersPerPage={usersPerPage}
-                          totalUsers={filteredUsers.length}
+                          totalUsers={compatibleUsers.length}
                           paginate={paginate}
                           currentPage={currentPage}
                         />
@@ -560,6 +573,6 @@ export default function Settings({ translatedTexts }) {
         </div>
       </div>
       <FooterNine />
-    </div>
+    </>
   );
 }

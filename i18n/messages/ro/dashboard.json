@@ -1,1 +1,21 @@
-{}
+{
+  "clientCompatibilityMetaTitleText": "Profil compatibil",
+  "clientCompatibilityMetaDescriptionText": "Vezi profilul unui membru compatibil.",
+  "messagesPageTitleText": "Mesaje",
+  "messagesPageChatsTitleText": "Conversații",
+  "messagesPageSelectUserText": "Selectează un contact",
+  "messagesPagePlaceholderText": "Scrie un mesaj…",
+  "messagesPageSendButtonText": "Trimite",
+  "messagesPageOwnUserText": "Tu",
+  "messagesPageNoChatsText": "Încă nu există conversații.",
+  "chatPeerUnavailableName": "Cont indisponibil",
+  "chatPeerUnavailableNotice": "Acest cont nu mai există sau a fost șters. Poți citi în continuare conversația, dar nu mai poți trimite mesaje noi.",
+  "chatPeerUnavailablePlaceholder": "Nu poți trimite mesaje acestui contact.",
+  "profileImageAltText": "Poză de profil",
+  "profileUnreadChatBannerText": "Ai mesaje necitite în chat.",
+  "sidebarChatUnreadAriaLabel": "Mesaje necitite în chat",
+  "chatUnreadGlobalBannerText": "Ai {count} mesaje necitite.",
+  "chatUnreadGlobalBannerCta": "Deschide chatul",
+  "compatibilityListUnreadBadgeAriaLabel": "Mesaje necitite în chat de la acest contact",
+  "chatUnreadLoginToastText": "Ai {count} mesaje necitite."
+}

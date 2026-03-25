@@ -82,6 +82,7 @@
   "adminNotesSavingText": "Enregistrement...",
   "adminNotesLoadingText": "Chargement...",
   "adminNotesStatusErrorText": "Erreur d'enregistrement",
+  "adminNotesSaveSuccessToastText": "Les notes ont été enregistrées.",
   "adminEditEnableText": "Modifier",
   "adminEditCancelText": "Annuler l'édition",
   "adminSaveUserText": "Enregistrer",

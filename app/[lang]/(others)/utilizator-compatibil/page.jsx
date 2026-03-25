@@ -5,7 +5,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import HeaderDashboard from "@/components/layout/headers/HeaderDashboard";
 import React from "react";
 import Settings from "@/components/dashboard/InformatiiUtilizator/Settings";
-import SidebarClient from "@/components/dashboard/SidebarClient";
+import ClientDashboardShell from "@/components/dashboard/ClientDashboardShell";
 import { getUserCompatibilityMessages } from "@/i18n/admin";
 
 export const metadata = {
@@ -28,15 +28,9 @@ export default async function page({ params }) {
           translatedTexts={translatedTexts}
         />
         <div className="content-wrapper js-content-wrapper overflow-hidden">
-          <div
-            id="dashboardOpenClose"
-            className="dashboard -home-9 js-dashboard-home-9"
-          >
-            <div className="dashboard__sidebar scroll-bar-1">
-              <SidebarClient translatedTexts={translatedTexts} />
-            </div>
+          <ClientDashboardShell translatedTexts={translatedTexts}>
             <Settings translatedTexts={translatedTexts} />
-          </div>
+          </ClientDashboardShell>
         </div>
       </main>
     </div>

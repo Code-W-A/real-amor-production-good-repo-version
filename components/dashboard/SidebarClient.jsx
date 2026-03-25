@@ -6,13 +6,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { handleLogout } from "@/utils/authUtils";
 import { useAuth } from "@/context/AuthContext";
+import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { authentication } from "@/firebase";
 import { withLocalePath } from "@/utils/routeLocale";
 
 export default function SidebarClient({ translatedTexts }) {
   const pathname = usePathname();
-  const { setLoading } = useAuth();
+  const { setLoading, userData } = useAuth();
+  const { totalUnread } = useClientChatUnreadValue();
   const router = useRouter();
   const loginPath = withLocalePath(pathname, "/login");
 
@@ -68,10 +70,24 @@ export default function SidebarClient({ translatedTexts }) {
           ) : (
             <Link
               href={itemHref}
-              className="d-flex items-center text-17 lh-1 fw-500 "
+              className="d-flex items-center text-17 lh-1 fw-500 position-relative"
             >
               <i className={`${elm.iconClass} mr-15`}></i>
               {elm.text}
+              {elm.id === 4 && totalUnread > 0 && (
+                <span
+                  className="d-flex items-center justify-center ml-10 text-11 fw-700 text-white rounded-full shrink-0"
+                  style={{
+                    minWidth: "22px",
+                    height: "22px",
+                    padding: "0 6px",
+                    backgroundColor: "#1a1a1a",
+                  }}
+                  aria-label={`${translatedTexts.sidebarChatUnreadAriaLabel}: ${totalUnread}`}
+                >
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </Link>
           )}
         </div>

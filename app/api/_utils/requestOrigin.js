@@ -4,8 +4,10 @@ export function getSafeOrigin(request) {
   const xfProto = request.headers.get("x-forwarded-proto");
   const xfHost = request.headers.get("x-forwarded-host");
   const host = xfHost || request.headers.get("host");
-  if (xfProto && host) {
-    return `${xfProto}://${host}`.replace(/\/$/, "");
+  // Multe proxy-uri trimit Host / X-Forwarded-Host fără X-Forwarded-Proto
+  if (host) {
+    const proto = xfProto || (isProd ? "https" : "http");
+    return `${proto}://${host}`.replace(/\/$/, "");
   }
 
   try {

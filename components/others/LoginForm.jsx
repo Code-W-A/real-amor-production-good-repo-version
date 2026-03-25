@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { usePathname, useRouter } from "next/navigation"; // Pentru a redirecționa după autentificare
 import { useAuth } from "@/context/AuthContext";
 import AlertBox from "../uiElements/AlertBox";
+import PasswordInput from "../uiElements/PasswordInput";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { withLocalePath } from "@/utils/routeLocale";
 
@@ -129,14 +130,15 @@ export default function LoginForm({
                   <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                     {parolaText}
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="password"
                     placeholder={parolaText}
                     value={formData.password}
                     onChange={handleChange}
-                    className="form-control"
                     required
+                    autoComplete="current-password"
+                    showPasswordLabel={translatedLinks.showPasswordLabel}
+                    hidePasswordLabel={translatedLinks.hidePasswordLabel}
                   />
                 </div>
 

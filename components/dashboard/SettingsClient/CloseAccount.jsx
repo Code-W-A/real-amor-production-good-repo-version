@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 import { handleLogout } from "@/utils/authUtils";
 import AlertBox from "@/components/uiElements/AlertBox";
+import PasswordInput from "@/components/uiElements/PasswordInput";
 
 export default function CloseAccount({ activeTab, translatedTexts }) {
   const { userData, setUserData, currentUser } = useAuth(); // Obținem datele utilizatorului curent
@@ -168,12 +169,14 @@ export default function CloseAccount({ activeTab, translatedTexts }) {
           <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
             {translatedTexts.enterPasswordText}
           </label>
-          <input
+          <PasswordInput
             required
-            type="password"
             placeholder={translatedTexts.enterPasswordText}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            showPasswordLabel={translatedTexts.passwordShowAriaLabel}
+            hidePasswordLabel={translatedTexts.passwordHideAriaLabel}
           />
         </div>
 

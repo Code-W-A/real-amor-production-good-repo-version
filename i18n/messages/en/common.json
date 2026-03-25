@@ -1,1 +1,4 @@
-{}
+{
+  "passwordShowAriaLabel": "Show password",
+  "passwordHideAriaLabel": "Hide password"
+}

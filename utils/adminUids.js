@@ -1,10 +1,11 @@
 /**
  * Single source of truth for "who is admin" across client and server.
  *
- * - Server (API routes): set `ADMIN_UIDS` (comma-separated)
- * - Client (browser): set `NEXT_PUBLIC_ADMIN_UIDS` (comma-separated)
+ * - Server (API routes): `ADMIN_UIDS` (comma-separated), or if empty use
+ *   `NEXT_PUBLIC_ADMIN_UIDS` (same list as client is OK).
+ * - Client (browser): `NEXT_PUBLIC_ADMIN_UIDS` (comma-separated)
  *
- * If neither is set, a small fallback list is used.
+ * If neither yields IDs, a small fallback list is used.
  */
 
 const FALLBACK_ADMIN_UIDS = [
@@ -26,9 +27,17 @@ function parseCsv(raw) {
 export function getAdminUidSet() {
   // In the browser bundle, only NEXT_PUBLIC_* is available.
   const isBrowser = typeof window !== "undefined";
-  const envList = isBrowser
-    ? parseCsv(process.env.NEXT_PUBLIC_ADMIN_UIDS)
-    : parseCsv(process.env.ADMIN_UIDS) || parseCsv(process.env.NEXT_PUBLIC_ADMIN_UIDS);
+  const fromPublic = parseCsv(process.env.NEXT_PUBLIC_ADMIN_UIDS);
+
+  let envList;
+  if (isBrowser) {
+    envList = fromPublic;
+  } else {
+    // Server: prefer ADMIN_UIDS; if unset/empty, use NEXT_PUBLIC_ADMIN_UIDS.
+    // Do not use `a || b` when `a` is [] — [] is truthy and would skip NEXT_PUBLIC_*.
+    const fromAdmin = parseCsv(process.env.ADMIN_UIDS);
+    envList = fromAdmin.length > 0 ? fromAdmin : fromPublic;
+  }
 
   const ids = envList?.length ? envList : FALLBACK_ADMIN_UIDS;
   return new Set(ids);

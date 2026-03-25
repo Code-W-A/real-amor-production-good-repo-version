@@ -23,7 +23,7 @@ export default async function Page({ params }) {
         methodeText={translatedLinks.methodeText}
         translatedLinks={translatedLinks}
       />
-      <div className="content-wrapper js-content-wrapper overflow-hidden">
+      <div className="content-wrapper js-content-wrapper">
         <section className="form-page js-mouse-move-container">
           <LoginFormAdmin
             emailText={translatedLinks.emailText}

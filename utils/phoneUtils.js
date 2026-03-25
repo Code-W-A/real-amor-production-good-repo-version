@@ -1,30 +1,76 @@
-import { getCountryCallingCode, parsePhoneNumberFromString } from "libphonenumber-js";
+import {
+  getCountries,
+  getCountryCallingCode,
+  parsePhoneNumberFromString,
+} from "libphonenumber-js";
 
-const COUNTRY_PHONE_META = [
-  { country: "BE", dialCode: "+32", name: "Belgique", flag: "🇧🇪" },
-  { country: "FR", dialCode: "+33", name: "France", flag: "🇫🇷" },
-  { country: "NL", dialCode: "+31", name: "Nederland", flag: "🇳🇱" },
-  { country: "RO", dialCode: "+40", name: "Romania", flag: "🇷🇴" },
-  { country: "DE", dialCode: "+49", name: "Deutschland", flag: "🇩🇪" },
-  { country: "ES", dialCode: "+34", name: "Espana", flag: "🇪🇸" },
-  { country: "IT", dialCode: "+39", name: "Italia", flag: "🇮🇹" },
-  { country: "PT", dialCode: "+351", name: "Portugal", flag: "🇵🇹" },
-  { country: "LU", dialCode: "+352", name: "Luxembourg", flag: "🇱🇺" },
-  { country: "CH", dialCode: "+41", name: "Suisse", flag: "🇨🇭" },
-  { country: "AT", dialCode: "+43", name: "Osterreich", flag: "🇦🇹" },
-  { country: "GB", dialCode: "+44", name: "United Kingdom", flag: "🇬🇧" },
-  { country: "US", dialCode: "+1", name: "United States", flag: "🇺🇸" },
-  { country: "CA", dialCode: "+1", name: "Canada", flag: "🇨🇦" },
-];
+function iso2ToFlagEmoji(iso2) {
+  const cc = String(iso2 || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(
+    ...[...cc].map((c) => 127397 + c.charCodeAt(0))
+  );
+}
 
-const META_BY_COUNTRY = COUNTRY_PHONE_META.reduce((acc, item) => {
+function buildAllCountryRows() {
+  const rows = [];
+  for (const country of getCountries()) {
+    try {
+      rows.push({
+        country,
+        dialCode: `+${getCountryCallingCode(country)}`,
+        flag: iso2ToFlagEmoji(country),
+      });
+    } catch {
+      // Regiune fără prefix în metadata (rar)
+    }
+  }
+  return rows;
+}
+
+const ALL_COUNTRY_ROWS = buildAllCountryRows();
+
+const META_BY_COUNTRY = ALL_COUNTRY_ROWS.reduce((acc, item) => {
   acc[item.country] = item;
   return acc;
 }, {});
 
-const META_BY_DIAL_SORTED = [...COUNTRY_PHONE_META].sort(
+const META_BY_DIAL_SORTED = [...ALL_COUNTRY_ROWS].sort(
   (a, b) => b.dialCode.length - a.dialCode.length
 );
+
+/** Limba UI pentru nume de țări (BCP 47, fragmentul de limbă). */
+function resolveDisplayLocale(locale) {
+  const raw = String(locale || "en").trim();
+  const base = raw.split(/[-_]/)[0].toLowerCase();
+  return base || "en";
+}
+
+const PHONE_OPTIONS_BY_LOCALE = new Map();
+
+function buildCountryPhoneOptionsForLocale(locale) {
+  const loc = resolveDisplayLocale(locale);
+  let displayNames;
+  try {
+    displayNames = new Intl.DisplayNames([loc], { type: "region" });
+  } catch {
+    displayNames = new Intl.DisplayNames(["en"], { type: "region" });
+  }
+
+  const sorted = [...ALL_COUNTRY_ROWS].sort((a, b) => {
+    const na = displayNames.of(a.country) || a.country;
+    const nb = displayNames.of(b.country) || b.country;
+    const primary = na.localeCompare(nb, loc, { sensitivity: "base" });
+    if (primary !== 0) return primary;
+    return a.country.localeCompare(b.country);
+  });
+
+  return sorted.map((item) => ({
+    country: item.country,
+    dialCode: item.dialCode,
+    label: `${item.flag} ${displayNames.of(item.country) || item.country} (${item.dialCode})`,
+  }));
+}
 
 function sanitizePhoneInput(rawValue) {
   const raw = String(rawValue || "").trim();
@@ -111,7 +157,6 @@ export function normalizePhone({
   const validationError = isValid ? "" : "invalid_phone";
 
   return {
-    // Keep legacy field semantics for existing UI.
     phone: phoneRaw,
     phoneRaw,
     phoneDisplay: formattedDisplay || phoneRaw || "",
@@ -124,12 +169,18 @@ export function normalizePhone({
   };
 }
 
-export function getCountryPhoneOptions() {
-  return COUNTRY_PHONE_META.map((item) => ({
-    country: item.country,
-    dialCode: item.dialCode,
-    label: `${item.flag} ${item.name} (${item.dialCode})`,
-  }));
+/**
+ * Opțiuni pentru selectorul de prefix telefonic (toate țările suportate de libphonenumber).
+ * @param {string} [locale] — limbă UI pentru numele țării (ex. fr, nl, en).
+ */
+export function getCountryPhoneOptions(locale = "en") {
+  const key = resolveDisplayLocale(locale);
+  if (PHONE_OPTIONS_BY_LOCALE.has(key)) {
+    return PHONE_OPTIONS_BY_LOCALE.get(key);
+  }
+  const built = buildCountryPhoneOptionsForLocale(key);
+  PHONE_OPTIONS_BY_LOCALE.set(key, built);
+  return built;
 }
 
 export function hasStoredPhone(userData) {
@@ -160,4 +211,3 @@ export function hasValidatedPhoneBundle(userData) {
 
   return true;
 }
-

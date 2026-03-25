@@ -238,7 +238,12 @@ export default function Settings({ translatedTexts }) {
                       translatedTexts={translatedTexts}
                     />
                   )}
-                  {activeTab === 2 && <Password />}
+                  {activeTab === 2 && (
+                    <Password
+                      activeTab={activeTab}
+                      translatedTexts={translatedTexts}
+                    />
+                  )}
                   {activeTab === 3 && <SocialProfiles />}
                   {activeTab === 4 && <Notification />}
                   {activeTab === 5 && <CloseAccount />}

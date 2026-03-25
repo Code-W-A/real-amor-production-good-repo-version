@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { authentication, db } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { EyeIcon, EyeOffIcon } from "@heroicons/react/solid";
-
 import {
   ref,
   uploadBytesResumable,
@@ -17,6 +15,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { v4 as uuidv4 } from "uuid"; // Pentru a genera ID-uri unice pentru imagini
 import AlertBox from "../uiElements/AlertBox";
+import PasswordInput from "../uiElements/PasswordInput";
 import { usePathname, useRouter } from "next/navigation";
 import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
 import { withLocalePath } from "@/utils/routeLocale";
@@ -63,12 +62,14 @@ const SignUpForm = ({
     showAlert: false,
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false); // Stare pentru checkbox-ul de acceptare
   const [phoneCountry, setPhoneCountry] = useState(
     targetLanguage === "nl" ? "NL" : "BE"
   );
-  const phoneCountryOptions = getCountryPhoneOptions();
+  const phoneCountryOptions = useMemo(
+    () => getCountryPhoneOptions(targetLanguage),
+    [targetLanguage]
+  );
 
   const router = useRouter();
   const pathname = usePathname();
@@ -384,8 +385,8 @@ const SignUpForm = ({
             <div
               style={{
                 maxHeight: "90vh",
-                overflowY: "scroll",
-                overflowX: "hidden",
+                overflowY: "auto",
+                overflowX: "visible",
               }}
               className="px-30 py-20 mt-50 md:px-25 md:py-25 bg-white shadow-1 rounded-16"
             >
@@ -603,15 +604,15 @@ const SignUpForm = ({
                   <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                     {passwordPlaceholder} *
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="password"
                     placeholder={passwordPlaceholder}
                     value={formData.password}
                     onChange={handleChange}
-                    className={`form-control ${
-                      formErrors.password ? "border-danger-red" : ""
-                    }`}
+                    hasError={!!formErrors.password}
+                    autoComplete="new-password"
+                    showPasswordLabel={translatedLinks.showPasswordLabel}
+                    hidePasswordLabel={translatedLinks.hidePasswordLabel}
                   />
                 </div>
 
@@ -619,15 +620,15 @@ const SignUpForm = ({
                   <label className="text-16 lh-1 fw-500 text-dark-1 mb-10">
                     {confirmPasswordPlaceholder} *
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="confirmPassword"
                     placeholder={confirmPasswordPlaceholder}
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`form-control ${
-                      formErrors.confirmPassword ? "border-danger-red" : ""
-                    }`}
+                    hasError={!!formErrors.confirmPassword}
+                    autoComplete="new-password"
+                    showPasswordLabel={translatedLinks.showPasswordLabel}
+                    hidePasswordLabel={translatedLinks.hidePasswordLabel}
                   />
                 </div>
 

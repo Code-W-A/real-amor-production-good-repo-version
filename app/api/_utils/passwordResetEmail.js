@@ -1,3 +1,9 @@
+/**
+ * Conținutul e-mailului trimis prin SMTP (subiect + HTML/text) este în fr sau nl.
+ * Pagina găzduită de Firebase la click pe link (resetare parolă în browser) folosește
+ * limba din Firebase Console (Auth → setări / șabloane) și poate rămâne în engleză
+ * dacă nu e localizată acolo — asta nu schimbă limba acestui e-mail.
+ */
 const SUPPORTED_PASSWORD_RESET_LOCALES = new Set(["fr", "nl"]);
 
 export function normalizePasswordResetLocale(locale, fallback = null) {

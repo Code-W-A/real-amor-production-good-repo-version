@@ -82,6 +82,7 @@
   "adminNotesSavingText": "Opslaan...",
   "adminNotesLoadingText": "Laden...",
   "adminNotesStatusErrorText": "Fout bij het opslaan",
+  "adminNotesSaveSuccessToastText": "De notities zijn opgeslagen.",
   "adminEditEnableText": "Bewerken",
   "adminEditCancelText": "Bewerken annuleren",
   "adminSaveUserText": "Opslaan",

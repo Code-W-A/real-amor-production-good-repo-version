@@ -3,5 +3,7 @@
   "methodeText": "Methode",
   "signUpText": "Registreren",
   "logInText": "Inloggen",
-  "contText": "Account"
+  "contText": "Account",
+  "passwordShowAriaLabel": "Wachtwoord tonen",
+  "passwordHideAriaLabel": "Wachtwoord verbergen"
 }

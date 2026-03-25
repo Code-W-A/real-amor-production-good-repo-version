@@ -8,6 +8,10 @@ export default function Pagination({
   paginate,
   currentPage,
 }) {
+  if (totalUsers <= 0) {
+    return null;
+  }
+
   const totalPages = Math.ceil(totalUsers / usersPerPage);
   const pageNumbers = [];
 

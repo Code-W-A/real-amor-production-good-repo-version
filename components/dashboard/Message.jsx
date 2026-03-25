@@ -12,22 +12,53 @@ import {
   getDocs,
   addDoc,
   onSnapshot,
-  where,
-  updateDoc,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
-import { query } from "firebase/database";
+import { sortedChatPath } from "@/utils/chatPath";
+import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
 import TypingAnimation from "./TypingAnimation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle } from "@fortawesome/free-solid-svg-icons";
 
+function formatMessageTimestamp(msg, locale) {
+  const d =
+    msg?.timestamp instanceof Date
+      ? msg.timestamp
+      : typeof msg?.timestamp?.toDate === "function"
+        ? msg.timestamp.toDate()
+        : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const tag = locale || "fr";
+  try {
+    return `${d.toLocaleDateString(tag)} ${d.toLocaleTimeString(tag, {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  } catch {
+    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
+}
+
+function peerDisplayName(user, translatedTexts) {
+  if (!user) return "";
+  if (user.chatPeerUnavailable) {
+    return translatedTexts?.chatPeerUnavailableName || "—";
+  }
+  return user.username ?? "";
+}
+
 export default function Message({ translatedTexts }) {
   const { userData } = useAuth();
+  const uiLocale = translatedTexts?.lang || "fr";
   const [compatibleUsers, setCompatibleUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [unseenMessages, setUnseenMessages] = useState({});
+  const { unreadByUserId: unseenMessages } = useClientChatUnreadValue();
 
   // Referință pentru containerul de mesaje
   const messagesEndRef = useRef(null);
@@ -62,15 +93,20 @@ export default function Message({ translatedTexts }) {
 
             const userDocRef = doc(db, "Users", userId);
             const userSnapshot = await getDoc(userDocRef);
-            const userInfo = { id: userSnapshot.id, ...userSnapshot.data() };
+            const exists = userSnapshot.exists();
+            const raw = exists ? userSnapshot.data() || {} : {};
+            const chatPeerUnavailable =
+              !exists || Boolean(raw?.deletedAccount?.isDeleted);
+            const userInfo = {
+              id: userSnapshot.id,
+              ...raw,
+              chatPeerUnavailable,
+            };
 
-            // Sortare UID-uri pentru `chatPath`
-            const chatPath = [userId, userData?.uid].sort().join("-");
-            const messagesQuery = query(
+            const chatPath = sortedChatPath(userId, userData?.uid);
+            const messagesSnapshot = await getDocs(
               collection(db, "Chats", chatPath, "Messages")
             );
-
-            const messagesSnapshot = await getDocs(messagesQuery);
             if (messagesSnapshot.empty) {
               return { ...userInfo, lastMessageTimestamp: null };
             }
@@ -117,16 +153,44 @@ export default function Message({ translatedTexts }) {
     scrollToBottom();
   }, [messages]);
 
+  // Marchează mesajele primite în conversația deschisă ca citite
+  useEffect(() => {
+    if (!selectedUser?.id || !userData?.uid) return;
+
+    const path = sortedChatPath(userData.uid, selectedUser.id);
+    let cancelled = false;
+
+    (async () => {
+      const snap = await getDocs(
+        collection(db, "Chats", path, "Messages")
+      );
+      const batch = writeBatch(db);
+      let updates = 0;
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.receiverId === userData.uid && data.seen !== true) {
+          batch.update(doc(db, "Chats", path, "Messages", d.id), {
+            seen: true,
+          });
+          updates += 1;
+        }
+      });
+      if (updates > 0 && !cancelled) {
+        await batch.commit();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.id, userData?.uid]);
+
   // Real-time listener for messages between user and selected user
   useEffect(() => {
     if (!selectedUser) return;
 
-    const chatRef = collection(
-      db,
-      "Chats",
-      `${userData?.uid}-${selectedUser.id}`,
-      "Messages"
-    );
+    const path = sortedChatPath(userData.uid, selectedUser.id);
+    const chatRef = collection(db, "Chats", path, "Messages");
 
     const unsubscribe = onSnapshot(chatRef, (snapshot) => {
       const fetchedMessages = snapshot.docs
@@ -141,7 +205,8 @@ export default function Message({ translatedTexts }) {
 
   // Function to handle sending messages
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
+    if (!newMessage.trim() || !selectedUser || selectedUser.chatPeerUnavailable)
+      return;
 
     const messageData = {
       senderId: userData?.uid,
@@ -151,24 +216,8 @@ export default function Message({ translatedTexts }) {
       seen: false,
     };
 
-    await addDoc(
-      collection(
-        db,
-        "Chats",
-        `${userData?.uid}-${selectedUser.id}`,
-        "Messages"
-      ),
-      messageData
-    );
-    await addDoc(
-      collection(
-        db,
-        "Chats",
-        `${selectedUser.id}-${userData?.uid}`,
-        "Messages"
-      ),
-      messageData
-    );
+    const path = sortedChatPath(userData.uid, selectedUser.id);
+    await addDoc(collection(db, "Chats", path, "Messages"), messageData);
 
     setNewMessage("");
   };
@@ -193,7 +242,7 @@ export default function Message({ translatedTexts }) {
     const typingRef = doc(
       db,
       "Chats",
-      `${userData?.uid}-${selectedUser.id}`,
+      sortedChatPath(userData.uid, selectedUser.id),
       "Typing",
       "State"
     );
@@ -208,12 +257,12 @@ export default function Message({ translatedTexts }) {
   }, [selectedUser, userData?.uid]);
 
   const handleTyping = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || selectedUser.chatPeerUnavailable) return;
 
     const typingRef = doc(
       db,
       "Chats",
-      `${selectedUser.id}-${userData?.uid}`, // Asigură-te că ordinea este corectă
+      sortedChatPath(userData.uid, selectedUser.id),
       "Typing",
       "State"
     );
@@ -230,7 +279,7 @@ export default function Message({ translatedTexts }) {
   };
 
   return (
-    <div className="dashboard__main">
+    <>
       <div className="dashboard__content bg-light-4">
         <div className="row pb-50 mb-10">
           <div className="col-auto">
@@ -251,11 +300,16 @@ export default function Message({ translatedTexts }) {
 
               <div className="py-30 px-30">
                 <div className="y-gap-30">
+                  {compatibleUsers.length === 0 && (
+                    <p className="text-14 text-light-1 lh-13">
+                      {translatedTexts.messagesPageNoChatsText}
+                    </p>
+                  )}
                   {compatibleUsers.map((user) => (
                     <div
                       key={user.id}
                       onClick={() => setSelectedUser(user)}
-                      className={`d-flex justify-between cursor-pointer ${
+                      className={`position-relative d-flex justify-between cursor-pointer ${
                         selectedUser?.id === user.id ? "bg-light-5" : ""
                       }`}
                     >
@@ -287,7 +341,7 @@ export default function Message({ translatedTexts }) {
                         </div>
                         <div className="ml-10">
                           <div className="lh-11 fw-500 text-dark-1">
-                            {user.username}
+                            {peerDisplayName(user, translatedTexts)}
                           </div>
                         </div>
                       </div>
@@ -298,7 +352,7 @@ export default function Message({ translatedTexts }) {
                             position: "absolute",
                             top: "-5px",
                             right: "-5px",
-                            backgroundColor: "#FF0000",
+                            backgroundColor: "#1a1a1a",
                             color: "#FFFFFF",
                             borderRadius: "50%",
                             width: "20px",
@@ -340,7 +394,7 @@ export default function Message({ translatedTexts }) {
                           width={50}
                           height={50}
                           src={selectedUser?.mainImage || "/default-avatar.png"}
-                          alt="image"
+                          alt={translatedTexts.profileImageAltText}
                           className="size-50"
                           style={{
                             borderRadius: "25%", // Imaginea rotundă
@@ -362,7 +416,7 @@ export default function Message({ translatedTexts }) {
                     <div className="ml-10">
                       <div className="lh-11 fw-500 text-dark-1">
                         {selectedUser
-                          ? selectedUser.username
+                          ? peerDisplayName(selectedUser, translatedTexts)
                           : translatedTexts.messagesPageSelectUserText}
                       </div>
                       {/* <div className="text-14 lh-11 mt-5">Active</div> */}
@@ -387,6 +441,17 @@ export default function Message({ translatedTexts }) {
                       {/* <div className="text-14 lh-11 mt-5">Active</div> */}
                     </div>
                   </div>
+                </div>
+              )}
+
+              {selectedUser?.chatPeerUnavailable && (
+                <div
+                  className="px-30 py-15 bg-light-3 border-bottom-light"
+                  role="status"
+                >
+                  <p className="text-14 lh-13 text-dark-1 mb-0">
+                    {translatedTexts.chatPeerUnavailableNotice}
+                  </p>
                 </div>
               )}
 
@@ -443,20 +508,10 @@ export default function Message({ translatedTexts }) {
                         <div className="lh-11 fw-500 text-dark-1 ml-10">
                           {msg?.senderId === userData?.uid
                             ? translatedTexts.messagesPageOwnUserText
-                            : selectedUser?.username}
+                            : peerDisplayName(selectedUser, translatedTexts)}
                         </div>
                         <div className="text-14 lh-11 ml-10">
-                          {msg?.timestamp instanceof Date
-                            ? `${msg.timestamp.toLocaleDateString()} ${msg.timestamp.toLocaleTimeString(
-                                [],
-                                { hour: "2-digit", minute: "2-digit" }
-                              )}`
-                            : msg?.timestamp?.toDate()?.toLocaleDateString() +
-                              " " +
-                              msg?.timestamp?.toDate()?.toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                          {formatMessageTimestamp(msg, uiLocale)}
                         </div>
                       </div>
                       <div className="d-inline-block mt-15">
@@ -528,7 +583,12 @@ export default function Message({ translatedTexts }) {
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder={translatedTexts.messagesPagePlaceholderText}
+                      placeholder={
+                        selectedUser?.chatPeerUnavailable
+                          ? translatedTexts.chatPeerUnavailablePlaceholder
+                          : translatedTexts.messagesPagePlaceholderText
+                      }
+                      disabled={!!selectedUser?.chatPeerUnavailable}
                       onKeyDown={(e) => {
                         handleKeyDown(e);
                         handleTyping(); // Apelează funcția de tastare
@@ -541,13 +601,18 @@ export default function Message({ translatedTexts }) {
                         border: "1px solid #ccc", // Linie de contur
                         padding: "10px", // Spațiu interior
                         overflowY: "auto", // Scroll vertical dacă textul depășește înălțimea
+                        opacity: selectedUser?.chatPeerUnavailable ? 0.65 : 1,
                       }}
                     />
                   </div>
                   <div className="col-auto">
                     <button
                       onClick={handleSendMessage}
+                      disabled={!!selectedUser?.chatPeerUnavailable}
                       className="button -md -purple-1 text-white shrink-0"
+                      style={{
+                        opacity: selectedUser?.chatPeerUnavailable ? 0.5 : 1,
+                      }}
                     >
                       {translatedTexts.messagesPageSendButtonText}
                     </button>
@@ -559,6 +624,6 @@ export default function Message({ translatedTexts }) {
         </div>
       </div>
       <FooterNine />
-    </div>
+    </>
   );
 }

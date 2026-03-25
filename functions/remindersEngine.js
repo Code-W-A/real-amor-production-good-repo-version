@@ -1,89 +1,120 @@
 const { getMailFrom } = require("./mailTransport");
 
+/** Intervals between sends: first mail 24h after stageEnteredAt; then 3d, 7d, 7d… */
+const MS_24H = 24 * 60 * 60 * 1000;
+const MS_3D = 3 * MS_24H;
+const MS_7D = 7 * MS_24H;
+
 const REMINDER_STAGES = {
   quiz_incomplete: {
-    cooldownHours: 48,
     messages: {
       fr: {
-        subject: "RealAmor: complétez votre questionnaire",
-        body: (username) =>
-          `Bonjour ${username || ""},\n\n` +
-          "Nous avons vu que votre questionnaire n'est pas encore finalisé.\n" +
-          "Complétez-le pour accéder à la suite du parcours RealAmor.\n\n" +
-          "Lien: https://app.real-amor.com/quiz\n\n" +
-          "Cordialement,\nL'équipe RealAmor",
+        subject: "Il ne manque plus qu'une étape pour finaliser votre profil",
+        body: (firstName) =>
+          `Bonjour ${firstName},\n\n` +
+          "Votre aventure avec RealAmor a déjà commencé, et il ne vous reste qu'une petite étape pour la poursuivre pleinement : compléter votre questionnaire en ligne.\n\n" +
+          "Ce questionnaire est bien plus qu'une formalité. Il nous permet de mieux comprendre votre univers émotionnel, vos valeurs et vos aspirations, afin de vous présenter des profils vraiment compatibles avec vous.\n\n" +
+          "Je complète mon questionnaire maintenant : https://app.real-amor.com/quiz\n\n" +
+          "Prenez ces quelques minutes pour vous – pour ce que vous désirez vraiment vivre. Chaque réponse que vous donnerez nous rapproche de la rencontre qui pourrait changer votre histoire.\n\n" +
+          "Avec douceur et bienveillance,\n\n" +
+          "L'équipe RealAmor\n\n" +
+          "www.real-amor.com",
       },
       nl: {
-        subject: "RealAmor: vul je vragenlijst aan",
-        body: (username) =>
-          `Hallo ${username || ""},\n\n` +
-          "We hebben gezien dat je vragenlijst nog niet volledig is ingevuld.\n" +
-          "Vul deze in om verder te gaan met je RealAmor-traject.\n\n" +
-          "Link: https://app.real-amor.com/quiz\n\n" +
-          "Met vriendelijke groet,\nHet RealAmor-team",
+        subject: "Er ontbreekt maar één stap om je profiel af te ronden",
+        body: (firstName) =>
+          `Hallo ${firstName},\n\n` +
+          "Jouw avontuur met RealAmor is al begonnen; er is nog maar één kleine stap om het volledig voort te zetten: je online vragenlijst invullen.\n\n" +
+          "Deze vragenlijst is meer dan een formaliteit. Zo begrijpen we beter je emotionele wereld, je waarden en je verwachtingen, zodat we je profielen kunnen voorstellen die écht bij je passen.\n\n" +
+          "Ik vul mijn vragenlijst nu in: https://app.real-amor.com/quiz\n\n" +
+          "Neem deze minuten voor jezelf – voor wat je echt wilt leven. Elk antwoord brengt je dichter bij de ontmoeting die je leven kan veranderen.\n\n" +
+          "Met warmte en zorg,\n\n" +
+          "Het RealAmor-team\n\n" +
+          "www.real-amor.com",
       },
     },
   },
   booking_not_paid: {
-    cooldownHours: 48,
     messages: {
       fr: {
-        subject: "RealAmor: finalisez votre réservation",
-        body: (username) =>
-          `Bonjour ${username || ""},\n\n` +
-          "Votre questionnaire est prêt. Il vous reste à finaliser le paiement du rendez-vous.\n\n" +
-          "Lien: https://app.real-amor.com/pricing\n\n" +
-          "Cordialement,\nL'équipe RealAmor",
+        subject: "Il est temps de franchir une belle étape avec RealAmor",
+        body: (firstName) =>
+          `Bonjour ${firstName},\n\n` +
+          "Vous êtes tout près de vivre une expérience unique, conçue pour vous aider à comprendre vos véritables affinités et à rencontrer l'amour d'une manière authentique.\n\n" +
+          "Il ne vous reste plus qu'à planifier votre rendez-vous de validation avec notre Equipe Neuroscientifique. Lors de cet échange, nous prendrons le temps de décrypter votre profil émotionnel et de peaufiner votre compatibilité avec précision.\n\n" +
+          "Je réserve mon rendez-vous maintenant : https://app.real-amor.com/pricing\n\n" +
+          "Ce moment est une étape précieuse sur votre chemin vers une relation sincère et durable. Nous serons ravis de vous accompagner dans cette belle aventure.\n\n" +
+          "À très bientôt,\n\n" +
+          "L'équipe RealAmor\n\n" +
+          "www.real-amor.com",
       },
       nl: {
-        subject: "RealAmor: rond je reservering af",
-        body: (username) =>
-          `Hallo ${username || ""},\n\n` +
-          "Je vragenlijst is klaar. De volgende stap is de betaling van je afspraak afronden.\n\n" +
-          "Link: https://app.real-amor.com/pricing\n\n" +
-          "Met vriendelijke groet,\nHet RealAmor-team",
+        subject: "Het is tijd voor een mooie volgende stap met RealAmor",
+        body: (firstName) =>
+          `Hallo ${firstName},\n\n` +
+          "Je staat op het punt een unieke ervaring te beleven, om je ware affiniteiten beter te begrijpen en liefde op een authentieke manier te ontmoeten.\n\n" +
+          "Je hoeft alleen nog je validatieafspraak te plannen met ons neurowetenschappelijk team. Tijdens dit gesprek nemen we de tijd om je emotionele profiel te verhelderen en je compatibiliteit zorgvuldig af te stemmen.\n\n" +
+          "Ik reserveer nu mijn afspraak: https://app.real-amor.com/pricing\n\n" +
+          "Dit is een waardevolle stap op weg naar een oprechte en duurzame relatie. We begeleiden je graag in dit mooie avontuur.\n\n" +
+          "Tot heel binnenkort,\n\n" +
+          "Het RealAmor-team\n\n" +
+          "www.real-amor.com",
       },
     },
   },
   booking_not_scheduled: {
-    cooldownHours: 48,
     messages: {
       fr: {
-        subject: "RealAmor: planifiez votre rendez-vous",
-        body: (username) =>
-          `Bonjour ${username || ""},\n\n` +
-          "Votre paiement est bien reçu. Prochaine étape: planifier votre rendez-vous vidéo.\n\n" +
-          "Lien: https://app.real-amor.com/booking\n\n" +
-          "Cordialement,\nL'équipe RealAmor",
+        subject: "Votre rendez-vous RealAmor vous attend !",
+        body: (firstName) =>
+          `Bonjour ${firstName},\n\n` +
+          "Merci d'avoir fait confiance à RealAmor et d'avoir confirmé votre engagement en réglant votre rendez-vous de validation neuroscientifique. Vous venez de poser une belle action en direction d'une relation plus vraie, plus alignée avec qui vous êtes vraiment.\n\n" +
+          "Il ne vous reste plus qu'une étape : réserver la date et l'heure de votre rendez-vous avec notre Equipe Neuroscientifique en visioconférence. Lors de cet échange, nous prendrons le temps d'explorer votre fonctionnement émotionnel, vos besoins profonds et vos compatibilités afin d'affiner au mieux vos futures rencontres.\n\n" +
+          "Je choisis mon créneau de rendez-vous : https://app.real-amor.com/booking\n\n" +
+          "Ce moment est un espace privilégié, entièrement dédié à vous, à votre histoire et à votre manière d'aimer. Nous avons hâte de vous rencontrer et de vous accompagner dans cette nouvelle étape de votre vie sentimentale.\n\n" +
+          "Avec bienveillance,\n\n" +
+          "L'équipe RealAmor\n\n" +
+          "www.real-amor.com",
       },
       nl: {
-        subject: "RealAmor: plan je afspraak in",
-        body: (username) =>
-          `Hallo ${username || ""},\n\n` +
-          "We hebben je betaling goed ontvangen. De volgende stap is je videogesprek plannen.\n\n" +
-          "Link: https://app.real-amor.com/booking\n\n" +
-          "Met vriendelijke groet,\nHet RealAmor-team",
+        subject: "Je RealAmor-afspraak wacht op je!",
+        body: (firstName) =>
+          `Hallo ${firstName},\n\n` +
+          "Bedankt voor je vertrouwen in RealAmor en dat je je validatieafspraak neuroscientifiek hebt betaald. Je zette net een mooie stap richting een relatie die eerlijker en beter bij je past.\n\n" +
+          "Er is nog één stap: kies datum en uur voor je videogesprek met ons neurowetenschappelijk team. We nemen de tijd om je emotionele patronen, je diepere behoeften en je compatibiliteit te verkennen om je toekomstige matches te verfijnen.\n\n" +
+          "Ik kies nu mijn tijdslot: https://app.real-amor.com/booking\n\n" +
+          "Dit is een bijzonder moment, helemaal voor jou, je verhaal en je manier van liefhebben. We kijken ernaar uit je te ontmoeten en je te begeleiden in deze nieuwe fase.\n\n" +
+          "Met zorg,\n\n" +
+          "Het RealAmor-team\n\n" +
+          "www.real-amor.com",
       },
     },
   },
   no_subscription: {
-    cooldownHours: 72,
     messages: {
-     fr: {
-  subject: "RealAmor: activez votre abonnement",
-  body: (username) =>
-    `Bonjour ${username || ""},\n\n` +
-    "Continuez votre suivi avec RealAmor. Activez un abonnement pour entrer dans la phase de matching.\n\n" +
-    "Lien : https://app.real-amor.com/subscriptions\n\n" +
-    "Cordialement,\nL'équipe RealAmor",
-},
+      fr: {
+        subject: "Votre histoire commence ici !",
+        body: (firstName) =>
+          `Bonjour ${firstName},\n\n` +
+          "Votre inscription sur RealAmor montre déjà votre envie de vivre une belle aventure, profonde et authentique. Il ne vous reste plus qu'une étape pour ouvrir la porte à des rencontres qui vous ressemblent : activer votre abonnement.\n\n" +
+          "En validant votre abonnement aujourd'hui, vous rejoignez un univers où chaque profil est soigneusement accompagné, avec l'appui de notre Equipe Neuroscientifique et de notre approche émotionnelle unique.\n\n" +
+          "J'active mon abonnement maintenant : https://app.real-amor.com/subscriptions\n\n" +
+          "Ne laissez pas cette belle chance en suspens. Nous serions ravis de vous aider à écrire la suite de votre histoire… avec sincérité, respect et émotion.\n\n" +
+          "Avec toute notre bienveillance,\n\n" +
+          "L'équipe RealAmor\n\n" +
+          "www.real-amor.com",
+      },
       nl: {
-        subject: "RealAmor: activeer je abonnement",
-        body: (username) =>
-          `Hallo ${username || ""},\n\n` +
-          "Je traject is ver gevorderd. Activeer een abonnement om naar de matchingfase te gaan.\n\n" +
-          "Link: https://app.real-amor.com/subscriptions\n\n" +
-          "Met vriendelijke groet,\nHet RealAmor-team",
+        subject: "Jouw verhaal begint hier!",
+        body: (firstName) =>
+          `Hallo ${firstName},\n\n` +
+          "Je inschrijving bij RealAmor laat al zien dat je een diepe, authentieke ontmoeting wilt. Er is nog één stap om de deur te openen naar mensen die bij je passen: je abonnement activeren.\n\n" +
+          "Door vandaag te abonneren, word je deel van een omgeving waar elk profiel zorgvuldig wordt begeleid, met de steun van ons neurowetenschappelijk team en onze unieke emotionele aanpak.\n\n" +
+          "Ik activeer nu mijn abonnement: https://app.real-amor.com/subscriptions\n\n" +
+          "Laat deze kans niet liggen. We helpen je graag het volgende hoofdstuk van je verhaal te schrijven… met oprechtheid, respect en emotie.\n\n" +
+          "Met alle goeds,\n\n" +
+          "Het RealAmor-team\n\n" +
+          "www.real-amor.com",
       },
     },
   },
@@ -102,6 +133,20 @@ function toMillis(value) {
   }
   const t = new Date(value).getTime();
   return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Prénom pour les salutations : champ dédié si présent, sinon premier mot du pseudo.
+ * @param {Object} userData Données utilisateur Firestore
+ * @return {string}
+ */
+function getFirstName(userData) {
+  if (!userData || typeof userData !== "object") return "";
+  const raw = String(userData.firstName || "").trim();
+  if (raw) return raw;
+  const u = String(userData.username || "").trim();
+  if (!u) return "";
+  return u.split(/\s+/)[0] || "";
 }
 
 function hasActiveSubscription(userData) {
@@ -145,7 +190,24 @@ function hasScheduledReservation(userData) {
   );
 }
 
+/**
+ * Champ Firestore `currentlyInCouple` (admin « actuellement en couple »), pas du texte FR dans la DB.
+ * @param {Object} userData Document Users
+ * @return {boolean}
+ */
+function isUserCurrentlyInCouple(userData) {
+  const v = userData?.currentlyInCouple;
+  if (v === true) return true;
+  // Donnée manuelle / edge case
+  if (v === "true") return true;
+  return false;
+}
+
 function matchesReminderStage(userData, stage) {
+  if (isUserCurrentlyInCouple(userData)) {
+    return false;
+  }
+
   const quizCompleted = hasCompletedQuiz(userData);
   const bookingPaid = hasPaidReservation(userData);
   const bookingScheduled = hasScheduledReservation(userData);
@@ -158,12 +220,99 @@ function matchesReminderStage(userData, stage) {
   return false;
 }
 
-function isReminderInCooldown(userData, stage, cooldownHours) {
-  const last = userData?.reminders?.[stage]?.lastSentAt || null;
-  const lastMs = toMillis(last);
-  if (!lastMs) return false;
-  const ageMs = Date.now() - lastMs;
-  return ageMs < cooldownHours * 60 * 60 * 1000;
+/**
+ * Résout l'ancre temporelle pour le premier envoi (24h après entrée dans l'étape).
+ * @param {Object} userData Données utilisateur
+ * @param {string} stage Clé d'étape reminder
+ * @return {number} Timestamp en millisecondes
+ */
+function resolveAnchorMs(userData, stage) {
+  const stageRem = userData?.reminders?.[stage] || {};
+  const fromStage = toMillis(stageRem.stageEnteredAt);
+  if (fromStage) return fromStage;
+  return toMillis(userData?.createdAt);
+}
+
+/**
+ * Éligibilité pour preview (sans écriture Firestore) : même échelle que l'envoi réel.
+ * @param {Object} userData Données utilisateur
+ * @param {string} stage Clé d'étape reminder
+ * @return {boolean}
+ */
+function isReminderEligibleForPreview(userData, stage) {
+  const count = Number(userData?.reminders?.[stage]?.count || 0);
+  const lastSentMs = toMillis(userData?.reminders?.[stage]?.lastSentAt);
+  const anchorMs = resolveAnchorMs(userData, stage);
+  const now = Date.now();
+
+  if (count === 0) {
+    if (!anchorMs) return false;
+    return now >= anchorMs + MS_24H;
+  }
+  if (count === 1) {
+    if (!lastSentMs) return false;
+    return now >= lastSentMs + MS_3D;
+  }
+  if (!lastSentMs) return false;
+  return now >= lastSentMs + MS_7D;
+}
+
+function isReminderEligibleByLadder(userData, stage) {
+  return isReminderEligibleForPreview(userData, stage);
+}
+
+/**
+ * Assure reminders[stage].stageEnteredAt (création du compte ou serveur). Si serverTimestamp seulement, skip l'envoi ce tour.
+ * @param {FirebaseFirestore.DocumentReference} userRef Référence document utilisateur
+ * @param {Object} userData Données utilisateur
+ * @param {string} stage Clé d'étape reminder
+ * @param {Object} admin Instance firebase-admin
+ * @return {!Promise<{ userData: Object, anchorJustInitializedWithServerTime: boolean }>}
+ */
+async function ensureStageEnteredAtIfMissing(userRef, userData, stage, admin) {
+  const stageRem = userData?.reminders?.[stage] || {};
+  if (stageRem.stageEnteredAt) {
+    return { userData, anchorJustInitializedWithServerTime: false };
+  }
+
+  const createdAt = userData?.createdAt;
+  if (createdAt) {
+    await userRef.set(
+      {
+        reminders: {
+          [stage]: {
+            stageEnteredAt: createdAt,
+          },
+        },
+      },
+      { merge: true }
+    );
+    return {
+      userData: {
+        ...userData,
+        reminders: {
+          ...(userData.reminders || {}),
+          [stage]: {
+            ...stageRem,
+            stageEnteredAt: createdAt,
+          },
+        },
+      },
+      anchorJustInitializedWithServerTime: false,
+    };
+  }
+
+  await userRef.set(
+    {
+      reminders: {
+        [stage]: {
+          stageEnteredAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+    },
+    { merge: true }
+  );
+  return { userData, anchorJustInitializedWithServerTime: true };
 }
 
 function getReminderLanguage(userData) {
@@ -180,9 +329,10 @@ function getReminderMessage(stage, userData) {
 function buildReminderEmail(stage, userData) {
   const message = getReminderMessage(stage, userData);
   if (!message) return null;
+  const firstName = getFirstName(userData);
   return {
     subject: message.subject,
-    text: message.body(userData?.username || ""),
+    text: message.body(firstName),
   };
 }
 
@@ -222,6 +372,7 @@ async function sendReminderSampleToInbox({
   const lang = String(targetLanguage).toLowerCase() === "nl" ? "nl" : "fr";
   const emailPayload = buildReminderEmail(stage, {
     username,
+    firstName: username,
     targetLanguage: lang,
   });
   if (!emailPayload) {
@@ -313,12 +464,26 @@ async function sendReminderForUser(stage, user, opts) {
     return { status: "skipped", reason: "invalid_stage" };
   }
 
-  const inCooldown = isReminderInCooldown(user.userData, stage, config.cooldownHours);
-  if (inCooldown && !force) {
-    return { status: "skipped", reason: "cooldown" };
+  let workingData = user.userData;
+
+  if (!force) {
+    const ensured = await ensureStageEnteredAtIfMissing(
+      user.userRef,
+      workingData,
+      stage,
+      admin
+    );
+    if (ensured.anchorJustInitializedWithServerTime) {
+      return { status: "skipped", reason: "anchor_initialized" };
+    }
+    workingData = ensured.userData;
+
+    if (!isReminderEligibleByLadder(workingData, stage)) {
+      return { status: "skipped", reason: "ladder_wait" };
+    }
   }
 
-  const emailPayload = buildReminderEmail(stage, user.userData);
+  const emailPayload = buildReminderEmail(stage, workingData);
   if (!emailPayload) {
     return { status: "skipped", reason: "missing_template" };
   }
@@ -330,7 +495,8 @@ async function sendReminderForUser(stage, user, opts) {
     text: emailPayload.text,
   });
 
-  const previousCount = Number(user.userData?.reminders?.[stage]?.count || 0);
+  const previousCount = Number(workingData?.reminders?.[stage]?.count || 0);
+
   await user.userRef.set(
     {
       reminders: {
@@ -449,15 +615,15 @@ async function runReminderStage(stage, opts) {
     const wouldSend = [];
     const wouldSkip = [];
     for (const user of capped) {
-      const inCooldown = isReminderInCooldown(user.userData, stage, config.cooldownHours);
+      const eligible = force || isReminderEligibleForPreview(user.userData, stage);
       const row = {
         uid: user.uid,
         email: user.email,
         username: user.username,
-        inCooldown,
+        eligible,
       };
-      if (inCooldown && !force) {
-        wouldSkip.push({ ...row, reason: "cooldown" });
+      if (!eligible && !force) {
+        wouldSkip.push({ ...row, reason: "ladder_wait_or_no_anchor" });
       } else {
         wouldSend.push(row);
       }
@@ -471,7 +637,7 @@ async function runReminderStage(stage, opts) {
         uid: u.uid,
         email: u.email,
         username: u.username,
-        inCooldown: isReminderInCooldown(u.userData, stage, config.cooldownHours),
+        eligible: force || isReminderEligibleForPreview(u.userData, stage),
       })),
       wouldSendCount: wouldSend.length,
       wouldSkipCount: wouldSkip.length,
@@ -701,4 +867,6 @@ module.exports = {
   sendReminderSampleToInbox,
   sendReminderSamplesToInbox,
   orderedReminderSampleStages,
+  getFirstName,
+  isReminderEligibleByLadder,
 };

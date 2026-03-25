@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
+import {
+  extractGenderSeekingWithProfileFallback,
+  areRomanticGenderSeekingCompatible,
+  isDemographicGenderOrSeekingQuestionText,
+} from "@/utils/compatibilityGenderGate";
 
 const SKIP_ANSWER = "Je préfère ne pas répondre à la question";
 const MAX_DIFFS = 200;
@@ -36,17 +41,12 @@ function answersEqual(a, b) {
   return JSON.stringify(normalizeAnswer(a)) === JSON.stringify(normalizeAnswer(b));
 }
 
-function getAnswerByText(responses, questionSets, regex) {
-  for (const set of questionSets) {
-    const question = responses?.[set]?.find((q) =>
-      regex.test(String(q?.text || "").trim().toLowerCase())
-    );
-    if (question?.answer) return question.answer;
-  }
-  return null;
-}
-
-function calculateCompatibilityDetailed(currentResponses, userResponses) {
+function calculateCompatibilityDetailed(
+  currentResponses,
+  userResponses,
+  profileGenderA = null,
+  profileGenderB = null
+) {
   const questionSets = [
     "firstQuestions",
     "questionsSet1",
@@ -54,27 +54,40 @@ function calculateCompatibilityDetailed(currentResponses, userResponses) {
     "questionsSet3",
   ];
 
-  // Gender/search compatibility gate (same logic as UI)
-  const genderRegex = /etes-vous/i;
-  const searchRegex = /cherchez-vous/i;
-  const currentGender = getAnswerByText(currentResponses, questionSets, genderRegex);
-  const currentSearch = getAnswerByText(currentResponses, questionSets, searchRegex);
-  const userGender = getAnswerByText(userResponses, questionSets, genderRegex);
-  const userSearch = getAnswerByText(userResponses, questionSets, searchRegex);
+  const packA = extractGenderSeekingWithProfileFallback(
+    currentResponses,
+    profileGenderA
+  );
+  const packB = extractGenderSeekingWithProfileFallback(
+    userResponses,
+    profileGenderB
+  );
 
-  const genderCompatibility =
-    currentSearch &&
-    userGender &&
-    String(currentSearch).includes(String(userGender)) &&
-    userSearch &&
-    currentGender &&
-    String(userSearch).includes(String(currentGender));
+  if (!packA.complete || !packB.complete) {
+    return {
+      eligible: false,
+      reason: "genderSeekingIncomplete",
+      meta: { packA, packB },
+      totalQuestions: 0,
+      totalCompatible: 0,
+      compatibilityScore: 0,
+      diffs: [],
+      skipped: [],
+    };
+  }
 
-  if (!genderCompatibility) {
+  if (
+    !areRomanticGenderSeekingCompatible(
+      packA.myGender,
+      packA.mySeeking,
+      packB.myGender,
+      packB.mySeeking
+    )
+  ) {
     return {
       eligible: false,
       reason: "genderCompatibility=false",
-      meta: { currentGender, currentSearch, userGender, userSearch },
+      meta: { packA, packB },
       totalQuestions: 0,
       totalCompatible: 0,
       compatibilityScore: 0,
@@ -148,10 +161,14 @@ function calculateCompatibilityDetailed(currentResponses, userResponses) {
         return;
       }
 
-      const isCompatible =
+      let isCompatible =
         currentQuestion?.answer &&
         matchedQuestion?.answer &&
         answersEqual(currentQuestion.answer, matchedQuestion.answer);
+
+      if (isDemographicGenderOrSeekingQuestionText(currentQuestion?.text)) {
+        isCompatible = true;
+      }
 
       compared.push({
         set,
@@ -175,7 +192,7 @@ function calculateCompatibilityDetailed(currentResponses, userResponses) {
   return {
     eligible: true,
     reason: "ok",
-    meta: { currentGender, currentSearch, userGender, userSearch },
+    meta: { packA, packB },
     totalQuestions,
     totalCompatible,
     compatibilityScore,
@@ -207,6 +224,8 @@ export async function POST(request) {
 
     let a = responsesA || null;
     let b = responsesB || null;
+    let profileGenderA = null;
+    let profileGenderB = null;
 
     if ((!a || !b) && uidA && uidB) {
       const snapA = await adminDb.collection("Users").doc(uidA).get();
@@ -214,8 +233,12 @@ export async function POST(request) {
       if (!snapA.exists || !snapB.exists) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
-      a = (snapA.data() || {}).responses || null;
-      b = (snapB.data() || {}).responses || null;
+      const dataA = snapA.data() || {};
+      const dataB = snapB.data() || {};
+      a = dataA.responses || null;
+      b = dataB.responses || null;
+      profileGenderA = dataA.gender ?? null;
+      profileGenderB = dataB.gender ?? null;
     }
 
     if (!a || !b) {
@@ -225,7 +248,12 @@ export async function POST(request) {
       );
     }
 
-    const result = calculateCompatibilityDetailed(a, b);
+    const result = calculateCompatibilityDetailed(
+      a,
+      b,
+      profileGenderA,
+      profileGenderB
+    );
 
     // If answers are not allowed, redact them (keep only normalized equality / question text)
     if (!allowAnswers) {

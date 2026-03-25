@@ -26,12 +26,13 @@ function getPostOnboardingPath(pathname, profile) {
   return withLocalePath(pathname, "/quiz");
 }
 
-export default function CompletePhoneForm({ translatedTexts }) {
+export default function CompletePhoneForm({ translatedTexts, locale: localeProp }) {
   const { currentUser, userData, setUserData } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
-  const lang = String(params?.lang || "fr").toLowerCase();
+  /** Prefer server-passed locale so SSR and hydration match (useParams can differ on first paint). */
+  const lang = String(localeProp ?? params?.lang ?? "fr").toLowerCase();
   const [phone, setPhone] = useState("");
   const [phoneCountry, setPhoneCountry] = useState(
     getPreferredCountry(lang, userData?.phoneCountry)
@@ -43,7 +44,10 @@ export default function CompletePhoneForm({ translatedTexts }) {
     showAlert: false,
   });
 
-  const phoneCountryOptions = useMemo(() => getCountryPhoneOptions(), []);
+  const phoneCountryOptions = useMemo(
+    () => getCountryPhoneOptions(lang),
+    [lang]
+  );
 
   const showAlert = (type, content) => {
     setAlertMessage({ type, content, showAlert: true });

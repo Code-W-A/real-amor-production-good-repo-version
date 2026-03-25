@@ -1,16 +1,16 @@
 import Image from "next/image";
-import { useSearchParams } from "next/navigation"; // Folosim useSearchParams în loc de useRouter
-import React, { useRef, useState, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore"; // Adăugăm updateDoc pentru a actualiza Firestore
 import { db } from "@/firebase"; // Asigură-te că ai importat corect db-ul configurat pentru Firebase
 import AlertBox from "@/components/uiElements/AlertBox";
-import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 import { questionsSet1, questionsSet2, questionsSet3 } from "@/data/quiz";
 import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
+import { withLocalePath } from "@/utils/routeLocale";
 
 function formatFirestoreDate(value) {
   if (!value) return null;
@@ -27,6 +27,14 @@ function formatFirestoreDate(value) {
     return value.toLocaleDateString();
   }
   return null;
+}
+
+/** Caractere interzise în nume de fișier pe Windows/macOS. */
+function sanitizePdfFileNameSegment(str) {
+  return String(str || "")
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 120);
 }
 
 export default function EditProfile({ activeTab, translatedTexts }) {
@@ -54,11 +62,24 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [adminNotes, setAdminNotes] = useState("");
   const [isLoadingAdminNotes, setIsLoadingAdminNotes] = useState(false);
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false);
-  const [adminNotesSaveError, setAdminNotesSaveError] = useState("");
   const lastSavedAdminNotesRef = useRef("");
-  const phoneCountryOptions = getCountryPhoneOptions();
+  const deleteSuccessRedirectRef = useRef(null);
+  const phoneCountryOptions = useMemo(
+    () => getCountryPhoneOptions(userData?.targetLanguage || "fr"),
+    [userData?.targetLanguage]
+  );
 
   const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    return () => {
+      if (deleteSuccessRedirectRef.current) {
+        clearTimeout(deleteSuccessRedirectRef.current);
+        deleteSuccessRedirectRef.current = null;
+      }
+    };
+  }, []);
 
   // Funcție pentru a prelua datele utilizatorului din Firebase pe baza UID-ului
   const fetchUserData = async (uid) => {
@@ -197,21 +218,25 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     if (!uid) return;
     try {
       setIsLoadingAdminNotes(true);
-      setAdminNotesSaveError("");
-      const token = await currentUser?.getIdToken?.();
-      if (!token) return;
 
       const res = await fetch(
-        `/api/admin-user-notes?uid=${encodeURIComponent(uid)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `/api/admin-user-notes?uid=${encodeURIComponent(uid)}`
       );
-      const data = await res.json();
-      if (res.ok && typeof data?.notes === "string") {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[admin-user-notes load] failed", {
+          status: res.status,
+          code: data?.code,
+          error: data?.error,
+        });
+        return;
+      }
+      if (typeof data?.notes === "string") {
         setAdminNotes(data.notes);
         lastSavedAdminNotesRef.current = data.notes;
       }
     } catch (e) {
-      console.error("Failed to load admin notes:", e);
+      console.error("[admin-user-notes load] exception", e);
     } finally {
       setIsLoadingAdminNotes(false);
     }
@@ -221,34 +246,47 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     if (!uid) return false;
     try {
       setIsSavingAdminNotes(true);
-      setAdminNotesSaveError("");
-      const token = await currentUser?.getIdToken?.();
-      if (!token) throw new Error("Not authenticated");
 
       const res = await fetch("/api/admin-user-notes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ uid, notes: nextNotes }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.success) {
-        throw new Error(
-          data?.error ||
-            translatedTexts?.failedToSaveNotesText ||
-            "Failed to save notes"
-        );
+        const detail = [data?.error, data?.code && `(${data.code})`]
+          .filter(Boolean)
+          .join(" ");
+        console.error("[admin-user-notes save] failed", {
+          status: res.status,
+          statusText: res.statusText,
+          code: data?.code,
+          error: data?.error,
+          uid,
+        });
+        throw new Error(detail || "save_failed");
       }
+      console.log("[admin-user-notes save] ok", { uid, length: String(nextNotes || "").length });
       lastSavedAdminNotesRef.current = String(nextNotes || "");
+      setAlertMessage({
+        type: "success",
+        content:
+          translatedTexts?.adminNotesSaveSuccessToastText ||
+          "Les notes ont été enregistrées.",
+        showAlert: true,
+      });
       return true;
     } catch (e) {
-      setAdminNotesSaveError(
-        e?.message ||
-          translatedTexts?.failedToSaveNotesText ||
-          "Failed to save notes"
-      );
+      const localizedError =
+        translatedTexts?.failedToSaveNotesText ||
+        "Échec de l'enregistrement des notes";
+      setAlertMessage({
+        type: "danger",
+        content: localizedError,
+        showAlert: true,
+      });
       return false;
     } finally {
       setIsSavingAdminNotes(false);
@@ -286,6 +324,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
         console.log(
           "User deleted from Authentication and Firestore successfully."
         );
+
+        if (deleteSuccessRedirectRef.current) {
+          clearTimeout(deleteSuccessRedirectRef.current);
+        }
+        deleteSuccessRedirectRef.current = setTimeout(() => {
+          deleteSuccessRedirectRef.current = null;
+          router.push(withLocalePath(pathname, "/lista-utilizatori"));
+        }, 3000);
       } else {
         const data = await authResponse.json().catch(() => ({}));
         throw new Error(data?.error || translatedTexts.errorDeleteUserText);
@@ -617,12 +663,6 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   ? translatedTexts?.adminNotesSavingText || "Enregistrement..."
                   : translatedTexts?.adminNotesSaveText || "Enregistrer"}
               </button>
-              {adminNotesSaveError ? (
-                <span style={{ fontWeight: "bold", color: "red" }}>
-                  {translatedTexts?.adminNotesStatusErrorText ||
-                    "Erreur d'enregistrement"}
-                </span>
-              ) : null}
             </div>
           </div>
 
@@ -877,9 +917,11 @@ export default function EditProfile({ activeTab, translatedTexts }) {
             <div className="col-12">
               <PDFDownloadLink
                 document={<QuizResultsDocument userData={userData} />}
-                fileName={`Rezultate_Chestionar_${
-                  userData?.username || "Utilizator"
-                }.pdf`}
+                fileName={`${translatedTexts?.quizResultsFileNamePrefix || "Résultats du Questionnaire"}_${sanitizePdfFileNameSegment(
+                  userData?.username ||
+                    translatedTexts?.genericUserText ||
+                    "User"
+                )}.pdf`}
                 className="button -md -purple-1 text-white"
               >
                 {({ loading }) =>

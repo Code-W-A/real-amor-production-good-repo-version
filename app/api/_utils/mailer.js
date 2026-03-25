@@ -3,6 +3,9 @@ import nodemailer from "nodemailer";
 let cachedTransporter = null;
 
 function parseSmtpPort(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    throw new Error("Missing SMTP_PORT (set e.g. SMTP_PORT=587)");
+  }
   const port = Number(value);
   if (!Number.isInteger(port) || port <= 0) {
     throw new Error("Invalid SMTP_PORT");

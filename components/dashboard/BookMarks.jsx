@@ -5,11 +5,13 @@ import CourseCardTwoDash from "./DashBoardCards/CourseCardTwoDash";
 import FooterNine from "../layout/footers/FooterNine";
 import Pagination from "../common/Pagination";
 import { useAuth } from "@/context/AuthContext";
+import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
 import { db } from "@/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
 export default function BookMarks({ translatedTexts }) {
-  const { userData, currentUser } = useAuth();
+  const { userData } = useAuth();
+  const { unreadByUserId } = useClientChatUnreadValue();
   const [compatibleUsers, setCompatibleUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,7 +61,7 @@ export default function BookMarks({ translatedTexts }) {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
-    <div className="dashboard__main">
+    <>
       <div className="dashboard__content bg-light-4">
         <div className="row pb-50 mb-10">
           <div className="col-auto">
@@ -79,6 +81,7 @@ export default function BookMarks({ translatedTexts }) {
                       data={user}
                       key={user.id}
                       translatedTexts={translatedTexts}
+                      unreadCount={unreadByUserId[user.id] || 0}
                     />
                   ))}
                 </div>
@@ -99,6 +102,6 @@ export default function BookMarks({ translatedTexts }) {
         </div>
       </div>
       <FooterNine />
-    </div>
+    </>
   );
 }

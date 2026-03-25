@@ -84,7 +84,7 @@ export default function EditProfile({
     } catch (error) {
       console.error("Error removing compatibility:", error);
       setAlertMessage({
-        type: "error",
+        type: "danger",
         content: translatedTexts.eliminaCompError,
         showAlert: true,
       });

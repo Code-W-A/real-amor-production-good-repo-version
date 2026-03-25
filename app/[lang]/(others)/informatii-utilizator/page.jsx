@@ -40,7 +40,9 @@ export default async function page({ params }) {
                 promotionsText={translatedTexts.promotionsText}
               />
             </div>
-            <Settings translatedTexts={translatedTexts} />
+            <div className="dashboard__main">
+              <Settings translatedTexts={translatedTexts} />
+            </div>
           </div>
         </div>
       </main>

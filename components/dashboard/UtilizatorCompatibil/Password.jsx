@@ -1,8 +1,22 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { usePathname } from "next/navigation";
+import PasswordInput from "@/components/uiElements/PasswordInput";
+import { getMessages } from "@/i18n";
+import { getLocaleFromPathname } from "@/utils/routeLocale";
 
 export default function Password({ activeTab }) {
+  const pathname = usePathname();
+  const lang = getLocaleFromPathname(pathname);
+  const { passwordShowAriaLabel, passwordHideAriaLabel } = getMessages(
+    lang,
+    "common"
+  );
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const handleSubmit = (e) => {
     e.preventDefault();
   };
@@ -16,7 +30,15 @@ export default function Password({ activeTab }) {
             Current password
           </label>
 
-          <input required type="text" placeholder="Current password" />
+          <PasswordInput
+            required
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+            showPasswordLabel={passwordShowAriaLabel}
+            hidePasswordLabel={passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-md-7">
@@ -24,7 +46,15 @@ export default function Password({ activeTab }) {
             New password
           </label>
 
-          <input required type="text" placeholder="New password" />
+          <PasswordInput
+            required
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            showPasswordLabel={passwordShowAriaLabel}
+            hidePasswordLabel={passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-md-7">
@@ -32,7 +62,15 @@ export default function Password({ activeTab }) {
             Confirm New Password
           </label>
 
-          <input required type="text" placeholder="Confirm New Password" />
+          <PasswordInput
+            required
+            placeholder="Confirm New Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            showPasswordLabel={passwordShowAriaLabel}
+            hidePasswordLabel={passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-12">

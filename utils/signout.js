@@ -5,7 +5,13 @@ import { authentication } from "../firebase";
 export const handleSignOut = (route) => {
   signOut(authentication)
     .then(() => {
-      // Sign-out successful.
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem("realamour_unread_chat_toast_shown");
+        } catch {
+          /* ignore */
+        }
+      }
       route.push("/signin");
     })
     .catch((error) => {

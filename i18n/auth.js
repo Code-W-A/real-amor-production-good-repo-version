@@ -67,6 +67,8 @@ export function getLoginMessages(locale) {
     signUpText: getCommonText(locale, "signUpText"),
     logInText: getCommonText(locale, "logInText"),
     contText: getCommonText(locale, "contText"),
+    showPasswordLabel: getCommonText(locale, "passwordShowAriaLabel"),
+    hidePasswordLabel: getCommonText(locale, "passwordHideAriaLabel"),
   };
 }
 
@@ -87,6 +89,8 @@ export function getLoginAdminMessages(locale) {
     signUpText: getCommonText(locale, "signUpText"),
     logInText: getCommonText(locale, "logInText"),
     contText: getCommonText(locale, "contText"),
+    showPasswordLabel: getCommonText(locale, "passwordShowAriaLabel"),
+    hidePasswordLabel: getCommonText(locale, "passwordHideAriaLabel"),
   };
 }
 
@@ -203,5 +207,7 @@ export function getSignupMessages(locale) {
     ),
     loadingText: getAuthText(locale, "signupLoadingText"),
     termsAndConditions: buildTermsAndConditions(locale),
+    showPasswordLabel: getCommonText(locale, "passwordShowAriaLabel"),
+    hidePasswordLabel: getCommonText(locale, "passwordHideAriaLabel"),
   };
 }

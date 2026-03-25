@@ -1,8 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import PasswordInput from "@/components/uiElements/PasswordInput";
 
-export default function Password({ activeTab }) {
+export default function Password({ activeTab, translatedTexts }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const handleSubmit = (e) => {
     e.preventDefault();
   };
@@ -16,7 +21,15 @@ export default function Password({ activeTab }) {
             Current password
           </label>
 
-          <input required type="text" placeholder="Current password" />
+          <PasswordInput
+            required
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+            showPasswordLabel={translatedTexts?.passwordShowAriaLabel}
+            hidePasswordLabel={translatedTexts?.passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-md-7">
@@ -24,7 +37,15 @@ export default function Password({ activeTab }) {
             New password
           </label>
 
-          <input required type="text" placeholder="New password" />
+          <PasswordInput
+            required
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
+            showPasswordLabel={translatedTexts?.passwordShowAriaLabel}
+            hidePasswordLabel={translatedTexts?.passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-md-7">
@@ -32,7 +53,15 @@ export default function Password({ activeTab }) {
             Confirm New Password
           </label>
 
-          <input required type="text" placeholder="Confirm New Password" />
+          <PasswordInput
+            required
+            placeholder="Confirm New Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
+            showPasswordLabel={translatedTexts?.passwordShowAriaLabel}
+            hidePasswordLabel={translatedTexts?.passwordHideAriaLabel}
+          />
         </div>
 
         <div className="col-12">

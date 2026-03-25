@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db, storage } from "@/firebase";
 import {
   ref,
@@ -13,8 +13,103 @@ import AlertBox from "@/components/uiElements/AlertBox";
 import { v4 as uuidv4 } from "uuid"; // Pentru a genera ID-uri unice pentru imagini
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "../InformatiiUtilizator/QuizResultsDocument";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { withLocalePath } from "@/utils/routeLocale";
+import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
 import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
+
+/** MIME + extensii: wildcard + tipuri explicite (unele OS necesită extensii). */
+const PROFILE_IMAGE_ACCEPT = [
+  "image/*",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/tiff",
+  "image/svg+xml",
+  "image/heic",
+  "image/heif",
+  "image/avif",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tif",
+  ".tiff",
+  ".svg",
+  ".heic",
+  ".heif",
+  ".avif",
+  ".ico",
+].join(",");
+
+const PROFILE_VIDEO_ACCEPT = [
+  "video/*",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/ogg",
+  "video/x-msvideo",
+  "video/3gpp",
+  "video/mpeg",
+  "video/x-matroska",
+  ".mp4",
+  ".mov",
+  ".m4v",
+  ".webm",
+  ".avi",
+  ".mkv",
+  ".3gp",
+  ".ogv",
+  ".mpeg",
+  ".mpg",
+].join(",");
+
+function guessMimeTypeFromFileName(fileName, kind) {
+  const ext = (fileName.split(".").pop() || "").toLowerCase();
+  const imageMap = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    bmp: "image/bmp",
+    tif: "image/tiff",
+    tiff: "image/tiff",
+    svg: "image/svg+xml",
+    heic: "image/heic",
+    heif: "image/heif",
+    avif: "image/avif",
+    ico: "image/x-icon",
+  };
+  const videoMap = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    m4v: "video/x-m4v",
+    webm: "video/webm",
+    avi: "video/x-msvideo",
+    mkv: "video/x-matroska",
+    "3gp": "video/3gpp",
+    ogv: "video/ogg",
+    mpeg: "video/mpeg",
+    mpg: "video/mpeg",
+  };
+  if (kind === "image") {
+    return imageMap[ext] || "application/octet-stream";
+  }
+  return videoMap[ext] || "application/octet-stream";
+}
+
+function storageMetadataForUpload(file, kind) {
+  const contentType = file.type || guessMimeTypeFromFileName(file.name, kind);
+  return { contentType };
+}
 
 const EditProfile = ({
   activeTab,
@@ -54,8 +149,14 @@ const EditProfile = ({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [phoneCountry, setPhoneCountry] = useState("BE");
-  const phoneCountryOptions = getCountryPhoneOptions();
+  const phoneCountryOptions = useMemo(
+    () => getCountryPhoneOptions(userData?.targetLanguage || "fr"),
+    [userData?.targetLanguage]
+  );
   const router = useRouter();
+  const pathname = usePathname();
+  const { totalUnread } = useClientChatUnreadValue();
+  const chatHref = withLocalePath(pathname, "/chat");
 
   useEffect(() => {
     if (userData) {
@@ -250,7 +351,8 @@ const EditProfile = ({
             const storageRef = ref(storage, `images/${image.fileName}`);
             const uploadTask = await uploadBytesResumable(
               storageRef,
-              image.file
+              image.file,
+              storageMetadataForUpload(image.file, "image")
             );
             const fileUrl = await getDownloadURL(uploadTask.ref);
             return {
@@ -269,7 +371,8 @@ const EditProfile = ({
         const storageRef = ref(storage, `videos/${tempVideo.videoName}`);
         const uploadTask = await uploadBytesResumable(
           storageRef,
-          tempVideo.file
+          tempVideo.file,
+          storageMetadataForUpload(tempVideo.file, "video")
         );
         const videoUrl = await getDownloadURL(uploadTask.ref);
 
@@ -360,6 +463,19 @@ const EditProfile = ({
       <div className="row justify-center items-center">
         <div className="col-xl-12 col-lg-12">
           <div className="px-30 py-10 mt-0 md:px-25 md:py-25">
+            {totalUnread > 0 && (
+              <div
+                className="mb-20 py-15 px-20 rounded-8 border border-purple-1 bg-light-7 -dark-bg-dark-2"
+                role="status"
+              >
+                <Link
+                  href={chatHref}
+                  className="text-15 lh-13 fw-500 text-purple-1 underline"
+                >
+                  {translatedTexts.profileUnreadChatBannerText}
+                </Link>
+              </div>
+            )}
             <form
               className="contact-form respondForm__form row y-gap-20 pt-10"
               onSubmit={handleSubmit}
@@ -440,7 +556,7 @@ const EditProfile = ({
                   <input
                     id="imageUpload"
                     type="file"
-                    accept="image/*"
+                    accept={PROFILE_IMAGE_ACCEPT}
                     onChange={handleImageUpload}
                     style={{ display: "none" }}
                   />
@@ -511,7 +627,7 @@ const EditProfile = ({
                     <input
                       id="videoUpload"
                       type="file"
-                      accept="video/*"
+                      accept={PROFILE_VIDEO_ACCEPT}
                       onChange={handleVideoUpload}
                       style={{ display: "none" }}
                     />

@@ -28,7 +28,7 @@ export default function Settings({ translatedTexts }) {
   }
 
   return (
-    <div className="dashboard__main">
+    <>
       <div className="dashboard__content bg-light-4">
         <div className="row pb-50 mb-10">
           <div className="col-auto">
@@ -97,6 +97,6 @@ export default function Settings({ translatedTexts }) {
       </div>
 
       <FooterNine />
-    </div>
+    </>
   );
 }

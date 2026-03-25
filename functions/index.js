@@ -1,13 +1,10 @@
-const crypto = require("crypto");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { createMailTransporter, getMailFrom } = require("./mailTransport");
 const {
   runReminderEngine,
+  buildReminderEmail,
   matchesReminderStage,
-  sendReminderForUser,
-  sendReminderSampleToInbox,
-  sendReminderSamplesToInbox,
 } = require("./remindersEngine");
 
 const Stripe = require("stripe");
@@ -221,7 +218,7 @@ exports.sendActivationEmail = functions.firestore
 
       // Configurarea opțiunilor de email
       const mailOptions = {
-        from: getMailFrom(),
+        from: "office@real-amor.com", // Adresa de email de pe cPanel
         to: email, // Emailul utilizatorului
         subject: emailSubject,
         text: emailMessage,
@@ -321,7 +318,7 @@ exports.sendSubscriptionEmail = functions.firestore
 
       // Configurarea opțiunilor de email
       const mailOptions = {
-        from: getMailFrom(),
+        from: "office@real-amor.com", // Adresa de email de pe cPanel
         to: email, // Emailul utilizatorului
         subject: emailSubject,
         text: emailMessage,
@@ -353,29 +350,29 @@ exports.sendFunnelTransitionEmails = functions.firestore
     if (newUser?.deletedAccount?.isDeleted) return null;
     if (!newUser?.email) return null;
 
-    const user = {
-      userRef: change.after.ref,
-      uid: change.after.id,
-      email: newUser.email,
-      username: newUser.username || "",
-      userData: newUser,
-    };
+    const stagesToAnchor = ["booking_not_paid", "booking_not_scheduled"];
 
-    const stagesToSend = ["booking_not_paid", "booking_not_scheduled"];
-
-    for (const stage of stagesToSend) {
+    for (const stage of stagesToAnchor) {
       const matchedBefore = matchesReminderStage(previousUser, stage);
       const matchedAfter = matchesReminderStage(newUser, stage);
       if (matchedBefore || !matchedAfter) continue;
 
+      const existingAnchor = newUser?.reminders?.[stage]?.stageEnteredAt;
+      if (existingAnchor) continue;
+
       try {
-        await sendReminderForUser(stage, user, {
-          admin,
-          transporter,
-          force: false,
-        });
+        await change.after.ref.set(
+          {
+            reminders: {
+              [stage]: {
+                stageEnteredAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            },
+          },
+          { merge: true }
+        );
       } catch (error) {
-        console.error(`Failed sending transition reminder for ${stage}:`, error);
+        console.error(`Failed setting stageEnteredAt for ${stage}:`, error);
       }
     }
 
@@ -477,120 +474,6 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function reminderTestSecretsMatch(expected, received) {
-  const e = String(expected || "");
-  const r = String(received || "");
-  if (!e || !r) return false;
-  try {
-    const bufE = Buffer.from(e, "utf8");
-    const bufR = Buffer.from(r, "utf8");
-    if (bufE.length !== bufR.length) return false;
-    return crypto.timingSafeEqual(bufE, bufR);
-  } catch {
-    return false;
-  }
-}
-
-function extractReminderTestSecretFromRequest(req) {
-  const header = req.headers["x-reminder-test-secret"];
-  if (header && String(header).trim()) {
-    return String(header).trim();
-  }
-  const auth = req.headers.authorization || "";
-  const m = String(auth).match(/^Bearer\s+(.+)$/i);
-  if (m) return m[1].trim();
-  return "";
-}
-
-function parseHttpJsonBody(req) {
-  const b = req.body;
-  if (b && typeof b === "object" && !Buffer.isBuffer(b)) {
-    return b;
-  }
-  if (Buffer.isBuffer(b)) {
-    try {
-      return JSON.parse(b.toString("utf8"));
-    } catch {
-      return null;
-    }
-  }
-  if (typeof b === "string") {
-    try {
-      return JSON.parse(b);
-    } catch {
-      return null;
-    }
-  }
-  return {};
-}
-
-/**
- * POST — trimite toate emailurile de reminder de probă (aceleași texte ca producția).
- * Secret: firebase functions:config:set reminders.test_secret="..."
- *
- * curl -sS -X POST "https://<region>-<project>.cloudfunctions.net/sendReminderSamplesHttp" \
- *   -H "Content-Type: application/json" \
- *   -H "X-Reminder-Test-Secret: YOUR_SECRET" \
- *   -d '{"to":"client@exemple.com","username":"Marie","allLangs":true}'
- */
-exports.sendReminderSamplesHttp = functions
-  .runWith({ timeoutSeconds: 120, memory: "256MB" })
-  .https.onRequest(async (req, res) => {
-    if (req.method === "OPTIONS") {
-      res.set("Access-Control-Allow-Origin", "*");
-      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-      res.set(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Reminder-Test-Secret"
-      );
-      return res.status(204).send("");
-    }
-
-    if (req.method !== "POST") {
-      return res.status(405).json({ ok: false, error: "method_not_allowed" });
-    }
-
-    const configuredSecret =
-      (functions.config().reminders && functions.config().reminders.test_secret) || "";
-    const providedSecret = extractReminderTestSecretFromRequest(req);
-
-    if (!reminderTestSecretsMatch(configuredSecret, providedSecret)) {
-      return res.status(401).json({ ok: false, error: "unauthorized" });
-    }
-
-    const body = parseHttpJsonBody(req);
-    if (body === null) {
-      return res.status(400).json({ ok: false, error: "invalid_json" });
-    }
-
-    const to = String(body.to || "").trim();
-    const username = String(body.username || "").trim();
-    const allLangs = body.allLangs === true;
-
-    if (!isValidEmail(to)) {
-      return res.status(400).json({ ok: false, error: "invalid_to" });
-    }
-
-    try {
-      const result = await sendReminderSamplesToInbox({
-        transporter,
-        to,
-        username,
-        allLangs,
-      });
-      res.set("Access-Control-Allow-Origin", "*");
-      return res.status(result.ok ? 200 : 500).json({ ok: result.ok, ...result });
-    } catch (err) {
-      console.error("sendReminderSamplesHttp failed:", err);
-      res.set("Access-Control-Allow-Origin", "*");
-      return res.status(500).json({
-        ok: false,
-        error: "send_failed",
-        message: err?.message || "unknown",
-      });
-    }
-  });
-
 exports.sendNoSubscriptionTestEmailCallable = functions
   .runWith({ timeoutSeconds: 120, memory: "256MB" })
   .https.onCall(async (data) => {
@@ -603,26 +486,26 @@ exports.sendNoSubscriptionTestEmailCallable = functions
       throw new functions.https.HttpsError("invalid-argument", "Valid `to` email is required.");
     }
 
-    const result = await sendReminderSampleToInbox({
-      transporter,
-      to,
+    const emailPayload = buildReminderEmail(stage, {
       username,
-      stage,
       targetLanguage: language,
     });
-
-    if (!result.ok) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        result.error || "send_failed"
-      );
+    if (!emailPayload) {
+      throw new functions.https.HttpsError("failed-precondition", "Missing reminder template.");
     }
+
+    const info = await transporter.sendMail({
+      from: process.env.MAIL_FROM || "office@real-amor.com",
+      to,
+      subject: emailPayload.subject,
+      text: emailPayload.text,
+    });
 
     return {
       ok: true,
       stage,
       to,
-      subject: result.subject,
-      messageId: result.messageId || null,
+      subject: emailPayload.subject,
+      messageId: info?.messageId || null,
     };
   });

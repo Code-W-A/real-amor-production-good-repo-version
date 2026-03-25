@@ -80,6 +80,13 @@ export const handleLogout = async () => {
   console.log("Start....log out");
   try {
     await signOut(authentication);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("realamour_unread_chat_toast_shown");
+      } catch {
+        /* ignore */
+      }
+    }
   } catch (error) {
     console.error(error);
     Alert.alert("Error", "Failed to log out.");

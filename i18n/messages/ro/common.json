@@ -1,1 +1,4 @@
-{}
+{
+  "passwordShowAriaLabel": "Afișează parola",
+  "passwordHideAriaLabel": "Ascunde parola"
+}

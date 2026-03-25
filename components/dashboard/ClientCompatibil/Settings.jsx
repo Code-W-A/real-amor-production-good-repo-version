@@ -8,7 +8,7 @@ export default function Settings({ translatedTexts, targetLanguage }) {
   const [activeTab, setActiveTab] = useState(1);
 
   return (
-    <div className="dashboard__main">
+    <>
       <div className="dashboard__content bg-light-4">
         <div className="row y-gap-30">
           <div className="col-12">
@@ -28,6 +28,6 @@ export default function Settings({ translatedTexts, targetLanguage }) {
       </div>
 
       <FooterNine />
-    </div>
+    </>
   );
 }

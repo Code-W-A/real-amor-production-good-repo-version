@@ -1,6 +1,6 @@
 import Preloader from "@/components/common/Preloader";
 import Settings from "@/components/dashboard/SettingsClient/Settings";
-import SidebarClient from "@/components/dashboard/SidebarClient";
+import ClientDashboardShell from "@/components/dashboard/ClientDashboardShell";
 import HeaderDashboard from "@/components/layout/headers/HeaderDashboard";
 import { getProfileMessages } from "@/i18n/dashboard";
 import React from "react";
@@ -20,15 +20,9 @@ export default async function page({ params }) {
           translatedTexts={translatedTexts}
         />
         <div className="content-wrapper js-content-wrapper overflow-hidden">
-          <div
-            id="dashboardOpenClose"
-            className="dashboard -home-9 js-dashboard-home-9"
-          >
-            <div className="dashboard__sidebar scroll-bar-1">
-              <SidebarClient translatedTexts={translatedTexts} />
-            </div>
+          <ClientDashboardShell translatedTexts={translatedTexts}>
             <Settings translatedTexts={translatedTexts} />
-          </div>
+          </ClientDashboardShell>
         </div>
       </main>
     </div>
