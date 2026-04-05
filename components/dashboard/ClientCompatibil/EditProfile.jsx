@@ -18,7 +18,7 @@ import React, { useEffect, useState } from "react";
 import { QuizResultsDocument } from "./QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
 import { withLocalePath } from "@/utils/routeLocale";
-import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
+import { getPhoneDisplayWithFlagForUi } from "@/utils/phoneUtils";
 
 export default function EditProfile({
   activeTab,
@@ -212,7 +212,7 @@ export default function EditProfile({
               required
               type="text"
               placeholder={translatedTexts.phoneNumberText}
-              value={getPhoneDisplayForUi(userData)}
+              value={getPhoneDisplayWithFlagForUi(userData)}
             />
           </div>
 

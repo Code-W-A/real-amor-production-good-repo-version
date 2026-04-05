@@ -12,6 +12,7 @@ import { questionsSet1, questionsSet2, questionsSet3 } from "@/data/quiz";
 import {
   getCountryPhoneOptions,
   getPhoneDisplayForUi,
+  getPhoneDisplayWithFlagForUi,
   normalizePhone,
 } from "@/utils/phoneUtils";
 import { withLocalePath } from "@/utils/routeLocale";
@@ -772,7 +773,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               value={
                 isEditMode
                   ? editUserDraft?.phone || ""
-                  : getPhoneDisplayForUi(userData)
+                  : getPhoneDisplayWithFlagForUi(userData)
               }
               onChange={(e) =>
                 setEditUserDraft((p) => ({ ...(p || {}), phone: e.target.value }))

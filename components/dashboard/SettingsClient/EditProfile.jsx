@@ -19,7 +19,7 @@ import { withLocalePath } from "@/utils/routeLocale";
 import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
 import {
   getCountryPhoneOptions,
-  getPhoneDisplayForUi,
+  getPhoneDisplayWithFlagForUi,
   normalizePhone,
 } from "@/utils/phoneUtils";
 
@@ -171,7 +171,7 @@ const EditProfile = ({
           const userInfo = userDoc.data();
           setFormData({
             username: userInfo.username || "",
-            phone: getPhoneDisplayForUi(userInfo),
+            phone: getPhoneDisplayWithFlagForUi(userInfo),
             aboutMe: userInfo.aboutMe || "",
             address: userInfo.address || "",
             gender: userInfo.gender,

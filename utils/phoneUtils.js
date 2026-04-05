@@ -195,6 +195,38 @@ export function getPhoneDisplayForUi(userData) {
   return String(userData.phone || "").trim();
 }
 
+/** Country flag emoji for UI: stored `phoneFlag`, else from `phoneCountry`, else inferred from E164/display. */
+export function getPhoneFlagForUi(userData) {
+  if (!userData || typeof userData !== "object") return "";
+  const stored = String(userData.phoneFlag || "").trim();
+  if (stored) return stored;
+  const iso = toIsoCountryCode(userData.phoneCountry);
+  if (iso && META_BY_COUNTRY[iso]?.flag) return META_BY_COUNTRY[iso].flag;
+  const e164 =
+    String(userData.phoneE164 || "").trim() ||
+    String(userData.phoneDisplay || "").trim();
+  if (e164.startsWith("+")) {
+    try {
+      const parsed = parsePhoneNumberFromString(e164);
+      const c = toIsoCountryCode(parsed?.country);
+      if (c && META_BY_COUNTRY[c]?.flag) return META_BY_COUNTRY[c].flag;
+    } catch {
+      // ignore
+    }
+    const byDial = inferCountryByDialCode(e164);
+    if (byDial?.flag) return byDial.flag;
+  }
+  return "";
+}
+
+/** Like `getPhoneDisplayForUi` but prefixes a flag when known (for read-only UI, not APIs). */
+export function getPhoneDisplayWithFlagForUi(userData) {
+  const num = getPhoneDisplayForUi(userData);
+  if (!num) return "";
+  const flag = getPhoneFlagForUi(userData);
+  return flag ? `${flag} ${num}` : num;
+}
+
 export function hasStoredPhone(userData) {
   if (!userData || typeof userData !== "object") return false;
   const e164 = String(userData.phoneE164 || "").trim();

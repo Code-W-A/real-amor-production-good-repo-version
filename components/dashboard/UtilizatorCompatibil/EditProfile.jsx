@@ -8,7 +8,7 @@ import { Router, useRouter } from "next/navigation";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { QuizResultsDocument } from "./QuizResultsDocument";
 import { useAuth } from "@/context/AuthContext";
-import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
+import { getPhoneDisplayWithFlagForUi } from "@/utils/phoneUtils";
 
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
@@ -200,7 +200,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               required
               type="text"
               placeholder="Telefon"
-              value={getPhoneDisplayForUi(userData)}
+              value={getPhoneDisplayWithFlagForUi(userData)}
             />
           </div>
 
