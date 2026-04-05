@@ -17,7 +17,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { withLocalePath } from "@/utils/routeLocale";
 import { useClientChatUnreadValue } from "@/components/dashboard/ClientChatUnreadContext";
-import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
+import {
+  getCountryPhoneOptions,
+  getPhoneDisplayForUi,
+  normalizePhone,
+} from "@/utils/phoneUtils";
 
 /** MIME + extensii: wildcard + tipuri explicite (unele OS necesită extensii). */
 const PROFILE_IMAGE_ACCEPT = [
@@ -167,7 +171,7 @@ const EditProfile = ({
           const userInfo = userDoc.data();
           setFormData({
             username: userInfo.username || "",
-            phone: userInfo.phoneDisplay || userInfo.phone || "",
+            phone: getPhoneDisplayForUi(userInfo),
             aboutMe: userInfo.aboutMe || "",
             address: userInfo.address || "",
             gender: userInfo.gender,

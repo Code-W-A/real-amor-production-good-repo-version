@@ -7,6 +7,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 import { withLocalePath } from "@/utils/routeLocale";
+import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 
 // Verifică dacă variabila de mediu este definită
 const stripePromise = loadStripe(
@@ -61,7 +62,7 @@ export default function Pricing({
           costRezervare: price * 100, // Convertim în bani (de exemplu, 10000 pentru 100 RON)
           nume: userData.username,
           email: userData.email,
-          phone: userData.phone,
+          phone: getPhoneDisplayForUi(userData),
           uid: userData.uid,
         }),
       });

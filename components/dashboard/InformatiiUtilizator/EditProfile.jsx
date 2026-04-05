@@ -9,7 +9,11 @@ import { QuizResultsDocument } from "../UtilizatorCompatibil/QuizResultsDocument
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 import { questionsSet1, questionsSet2, questionsSet3 } from "@/data/quiz";
-import { getCountryPhoneOptions, normalizePhone } from "@/utils/phoneUtils";
+import {
+  getCountryPhoneOptions,
+  getPhoneDisplayForUi,
+  normalizePhone,
+} from "@/utils/phoneUtils";
 import { withLocalePath } from "@/utils/routeLocale";
 
 function formatFirestoreDate(value) {
@@ -408,7 +412,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           userData?.age === null || typeof userData?.age === "undefined"
             ? ""
             : String(userData.age),
-        phone: userData?.phone || "",
+        phone: getPhoneDisplayForUi(userData),
         phoneCountry: userData?.phoneCountry || "BE",
         email: userData?.email || "",
         aboutMe: userData?.aboutMe || "",
@@ -765,7 +769,11 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               placeholder={
                 translatedTexts?.phonePlaceholderText || "Telefon"
               }
-              value={isEditMode ? editUserDraft?.phone || "" : userData?.phone || ""}
+              value={
+                isEditMode
+                  ? editUserDraft?.phone || ""
+                  : getPhoneDisplayForUi(userData)
+              }
               onChange={(e) =>
                 setEditUserDraft((p) => ({ ...(p || {}), phone: e.target.value }))
               }

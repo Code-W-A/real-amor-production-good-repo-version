@@ -3,6 +3,7 @@ import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
 import * as XLSX from "xlsx";
+import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -233,7 +234,7 @@ function toExportRow(uid, data, texts) {
     uid,
     username: data.username || "",
     email: data.email || "",
-    phone: data.phoneDisplay || data.phone || "",
+    phone: getPhoneDisplayForUi(data),
     phoneE164: data.phoneE164 || "",
     phoneCountry: data.phoneCountry || "",
     phoneDialCode: data.phoneDialCode || "",

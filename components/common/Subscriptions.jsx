@@ -10,6 +10,7 @@ import DotLoader from "react-spinners/DotLoader";
 import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { withLocalePath } from "@/utils/routeLocale";
+import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 
 // Cheia publică Stripe
 const stripePromise = loadStripe(
@@ -165,7 +166,7 @@ export default function Subscriptions({
           planKey, // Server selects correct priceId based on STRIPE_MODE (test/live)
           nume: userData.username,
           email: userData.email,
-          phone: userData.phone,
+          phone: getPhoneDisplayForUi(userData),
           uid: userData.uid,
           subName,
           ...(opts?.type === "subscription" &&

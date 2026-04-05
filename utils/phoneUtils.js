@@ -183,6 +183,18 @@ export function getCountryPhoneOptions(locale = "en") {
   return built;
 }
 
+/** Best string to show in UI: international display when available, else E164 / legacy raw / `phone`. */
+export function getPhoneDisplayForUi(userData) {
+  if (!userData || typeof userData !== "object") return "";
+  const display = String(userData.phoneDisplay || "").trim();
+  if (display) return display;
+  const e164 = String(userData.phoneE164 || "").trim();
+  if (e164) return e164;
+  const raw = String(userData.phoneRaw || "").trim();
+  if (raw) return raw;
+  return String(userData.phone || "").trim();
+}
+
 export function hasStoredPhone(userData) {
   if (!userData || typeof userData !== "object") return false;
   const e164 = String(userData.phoneE164 || "").trim();

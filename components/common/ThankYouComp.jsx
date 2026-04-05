@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { withLocalePath } from "@/utils/routeLocale";
+import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 
 export default function ThankYouReservation({
   reservationTitle,
@@ -35,7 +36,7 @@ export default function ThankYouReservation({
       setReservationDetails({
         name: userData?.username,
         email: userData?.email,
-        phone: userData?.phone,
+        phone: getPhoneDisplayForUi(userData),
         date: dateText,
         time: timeText,
       });

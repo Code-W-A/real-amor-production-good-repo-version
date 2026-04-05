@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { withLocalePath } from "@/utils/routeLocale";
+import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 
 export default function SubscriptionSuc({
   paymentTitle,
@@ -393,7 +394,8 @@ export default function SubscriptionSuc({
                             <br />
                             <strong>{emailText}:</strong> {userData?.email}
                             <br />
-                            <strong>{phoneText}:</strong> {userData?.phone}
+                            <strong>{phoneText}:</strong>{" "}
+                            {getPhoneDisplayForUi(userData)}
                             <br />
                             <strong>{amountPaidText}:</strong>{" "}
                             {reservationData.amount_total / 100} EURO
