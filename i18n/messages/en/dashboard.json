@@ -22,6 +22,7 @@
   "loadingText": "Loading...",
   "subscriptionDetailsText": "Subscription details",
   "subscriptionIdText": "Subscription ID",
+  "subscriptionAmountText": "Subscription amount",
   "manualReferenceLabelText": "Manual reference",
   "planText": "Plan",
   "expiryDateText": "Expiry date",

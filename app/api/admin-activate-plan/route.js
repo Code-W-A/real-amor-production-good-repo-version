@@ -25,6 +25,26 @@ function normalizePlanKey(raw) {
   return String(raw || "").trim().toUpperCase();
 }
 
+function hasActiveSubscription(userData) {
+  return (
+    userData?.lifetimeAccess === true ||
+    userData?.subscriptionStatus === "lifetime" ||
+    userData?.subscriptionStatus === "active" ||
+    userData?.subscriptionStatus === "canceledUntilEnd" ||
+    userData?.subscriptionActive === true
+  );
+}
+
+function toIsoDate(value) {
+  if (!value) return null;
+  if (typeof value?.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 export async function POST(request) {
   try {
     const auth = await requireAuth(request);
@@ -39,6 +59,7 @@ export async function POST(request) {
     const uid = String(body?.uid || "").trim();
     const planKey = normalizePlanKey(body?.planKey);
     const reviewNote = String(body?.reviewNote || "").slice(0, 1200);
+    const overrideActiveSubscription = body?.overrideActiveSubscription === true;
 
     if (!uid || !planKey) {
       return NextResponse.json({ error: "Missing uid or planKey" }, { status: 400 });
@@ -55,6 +76,18 @@ export async function POST(request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
     const userData = userSnap.data() || {};
+    if (!overrideActiveSubscription && hasActiveSubscription(userData)) {
+      return NextResponse.json(
+        {
+          error: "Active subscription exists. Override confirmation required.",
+          needsOverride: true,
+          currentPlan: String(userData?.subName || "").trim() || null,
+          currentStatus: String(userData?.subscriptionStatus || "").trim() || null,
+          subscriptionEndDate: toIsoDate(userData?.subscriptionEndDate),
+        },
+        { status: 409 }
+      );
+    }
 
     // Best effort: prevent further Stripe rebilling if the user still has a Stripe sub id.
     if (userData?.subscriptionId) {

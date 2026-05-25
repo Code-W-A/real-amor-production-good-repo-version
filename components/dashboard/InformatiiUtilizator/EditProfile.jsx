@@ -51,6 +51,20 @@ function manualStatusLabel(status) {
   return "En attente";
 }
 
+function formatOverrideContextText(context) {
+  if (!context || typeof context !== "object") return "";
+  const parts = [];
+  if (context?.currentPlan) parts.push(`Plan actuel: ${context.currentPlan}`);
+  if (context?.currentStatus) parts.push(`Statut actuel: ${context.currentStatus}`);
+  if (context?.subscriptionEndDate) {
+    const parsed = new Date(context.subscriptionEndDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      parts.push(`Expiration: ${parsed.toLocaleDateString()}`);
+    }
+  }
+  return parts.join(" | ");
+}
+
 const ADMIN_DIRECT_PLAN_OPTIONS = [
   { key: "SUB_3M", label: "Abonnement 3 mois", amountEur: 417 },
   { key: "SUB_6M", label: "Abonnement 6 mois", amountEur: 654 },
@@ -90,6 +104,14 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [directPlanKey, setDirectPlanKey] = useState("SUB_3M");
   const [directPlanReviewNote, setDirectPlanReviewNote] = useState("");
   const [isActivatingPlan, setIsActivatingPlan] = useState(false);
+  const [duplicateSubscriptionPrompt, setDuplicateSubscriptionPrompt] = useState({
+    open: false,
+    mode: null,
+    payload: null,
+    contextText: "",
+  });
+  const [isSubmittingDuplicateOverride, setIsSubmittingDuplicateOverride] =
+    useState(false);
   const lastSavedAdminNotesRef = useRef("");
   const deleteSuccessRedirectRef = useRef(null);
   const phoneCountryOptions = useMemo(
@@ -349,14 +371,22 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
-  const reviewManualPayment = async (paymentId, decision) => {
+  const reviewManualPayment = async (
+    paymentId,
+    decision,
+    options = { overrideActiveSubscription: false, payloadOverride: null }
+  ) => {
     if (!uid || !paymentId) return;
     try {
       setReviewingManualPaymentId(paymentId);
       const token = await currentUser?.getIdToken?.();
       if (!token) throw new Error("Not authenticated");
 
-      const reviewNote = String(manualPaymentReviewNotes?.[paymentId] || "");
+      const payload = options?.payloadOverride || {
+        paymentId,
+        decision,
+        reviewNote: String(manualPaymentReviewNotes?.[paymentId] || ""),
+      };
       const res = await fetch("/api/admin-manual-payment-review", {
         method: "POST",
         headers: {
@@ -364,12 +394,21 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          paymentId,
-          decision,
-          reviewNote,
+          ...payload,
+          overrideActiveSubscription:
+            options?.overrideActiveSubscription === true,
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data?.needsOverride) {
+        setDuplicateSubscriptionPrompt({
+          open: true,
+          mode: "review_manual_payment",
+          payload,
+          contextText: formatOverrideContextText(data),
+        });
+        return;
+      }
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Failed to review payment");
       }
@@ -406,12 +445,20 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
-  const adminActivatePlan = async () => {
+  const adminActivatePlan = async (
+    options = { overrideActiveSubscription: false, payloadOverride: null }
+  ) => {
     if (!uid || !directPlanKey) return;
     try {
       setIsActivatingPlan(true);
       const token = await currentUser?.getIdToken?.();
       if (!token) throw new Error("Not authenticated");
+
+      const payload = options?.payloadOverride || {
+        uid,
+        planKey: directPlanKey,
+        reviewNote: String(directPlanReviewNote || ""),
+      };
 
       const res = await fetch("/api/admin-activate-plan", {
         method: "POST",
@@ -420,12 +467,21 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          uid,
-          planKey: directPlanKey,
-          reviewNote: String(directPlanReviewNote || ""),
+          ...payload,
+          overrideActiveSubscription:
+            options?.overrideActiveSubscription === true,
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data?.needsOverride) {
+        setDuplicateSubscriptionPrompt({
+          open: true,
+          mode: "activate_plan",
+          payload,
+          contextText: formatOverrideContextText(data),
+        });
+        return;
+      }
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Failed to activate plan");
       }
@@ -450,6 +506,48 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       console.error("Error activating plan (admin):", error);
     } finally {
       setIsActivatingPlan(false);
+    }
+  };
+
+  const closeDuplicateSubscriptionPrompt = () => {
+    if (isSubmittingDuplicateOverride) return;
+    setDuplicateSubscriptionPrompt({
+      open: false,
+      mode: null,
+      payload: null,
+      contextText: "",
+    });
+  };
+
+  const confirmDuplicateSubscriptionOverride = async () => {
+    const mode = duplicateSubscriptionPrompt?.mode;
+    const payload = duplicateSubscriptionPrompt?.payload;
+    if (!mode || !payload) {
+      closeDuplicateSubscriptionPrompt();
+      return;
+    }
+
+    try {
+      setIsSubmittingDuplicateOverride(true);
+      if (mode === "activate_plan") {
+        await adminActivatePlan({
+          overrideActiveSubscription: true,
+          payloadOverride: payload,
+        });
+      } else if (mode === "review_manual_payment") {
+        await reviewManualPayment(payload.paymentId, payload.decision, {
+          overrideActiveSubscription: true,
+          payloadOverride: payload,
+        });
+      }
+    } finally {
+      setIsSubmittingDuplicateOverride(false);
+      setDuplicateSubscriptionPrompt({
+        open: false,
+        mode: null,
+        payload: null,
+        contextText: "",
+      });
     }
   };
 
@@ -1733,6 +1831,60 @@ export default function EditProfile({ activeTab, translatedTexts }) {
           </div>
         </div>
       )}
+
+      {duplicateSubscriptionPrompt?.open ? (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 1000,
+            backgroundColor: "white",
+            padding: "20px",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+            borderRadius: "8px",
+            width: "520px",
+            maxWidth: "90vw",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontWeight: "bold", marginBottom: 8 }}>
+            Le Client a déjà souscrit un abonnement en cours, êtes vous sûrs de
+            vouloir demander un nouvel abonnement pour ce client?
+          </p>
+          {duplicateSubscriptionPrompt?.contextText ? (
+            <p style={{ marginBottom: 8 }}>
+              {duplicateSubscriptionPrompt.contextText}
+            </p>
+          ) : null}
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+            <button
+              className="button -md -green-5"
+              onClick={confirmDuplicateSubscriptionOverride}
+              disabled={isSubmittingDuplicateOverride}
+            >
+              Oui
+            </button>
+            <button
+              className="button -md -gray-1 text-dark-1"
+              onClick={closeDuplicateSubscriptionPrompt}
+              disabled={isSubmittingDuplicateOverride}
+            >
+              Non
+            </button>
+          </div>
+          {isSubmittingDuplicateOverride ? (
+            <div style={{ marginTop: 10 }}>
+              <DotLoader color="#c13365" size={20} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <AlertBox
         type={alertMessage.type}

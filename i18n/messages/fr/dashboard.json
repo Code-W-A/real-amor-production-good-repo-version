@@ -55,6 +55,7 @@
   "loadingText": "Chargement...",
   "subscriptionDetailsText": "Details de l'abonnement",
   "subscriptionIdText": "ID d'abonnement",
+  "subscriptionAmountText": "Montant de l'abonnement",
   "planText": "Formule",
   "expiryDateText": "Date d'expiration",
   "cancelSubscriptionText": "Annuler l'abonnement",

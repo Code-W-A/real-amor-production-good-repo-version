@@ -33,6 +33,26 @@ function normalizeStatus(raw) {
   return MANUAL_PAYMENT_STATUS_PENDING;
 }
 
+function hasActiveSubscription(userData) {
+  return (
+    userData?.lifetimeAccess === true ||
+    userData?.subscriptionStatus === "lifetime" ||
+    userData?.subscriptionStatus === "active" ||
+    userData?.subscriptionStatus === "canceledUntilEnd" ||
+    userData?.subscriptionActive === true
+  );
+}
+
+function toIsoDate(value) {
+  if (!value) return null;
+  if (typeof value?.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 function buildReservationRevokeUpdate(payment, userData) {
   const currentReservation =
     userData?.reservation && typeof userData.reservation === "object"
@@ -104,6 +124,7 @@ export async function POST(request) {
     const paymentId = String(body?.paymentId || "").trim();
     const decision = parseDecision(body?.decision);
     const reviewNote = String(body?.reviewNote || "").slice(0, 1200);
+    const overrideActiveSubscription = body?.overrideActiveSubscription === true;
 
     if (!paymentId || !decision) {
       return NextResponse.json(
@@ -155,6 +176,23 @@ export async function POST(request) {
         }
         userData = userSnap.data() || {};
         userDataForEmail = userData;
+      }
+
+      if (
+        decision === MANUAL_PAYMENT_STATUS_CONFIRMED &&
+        (existingPaymentData?.paymentType === "subscription" ||
+          existingPaymentData?.paymentType === "lifetime") &&
+        !overrideActiveSubscription &&
+        hasActiveSubscription(userData)
+      ) {
+        const conflictError = new Error("ACTIVE_SUBSCRIPTION_OVERRIDE_REQUIRED");
+        conflictError.code = "ACTIVE_SUBSCRIPTION_OVERRIDE_REQUIRED";
+        conflictError.context = {
+          currentPlan: String(userData?.subName || "").trim() || null,
+          currentStatus: String(userData?.subscriptionStatus || "").trim() || null,
+          subscriptionEndDate: toIsoDate(userData?.subscriptionEndDate),
+        };
+        throw conflictError;
       }
 
       const now = new Date();
@@ -272,6 +310,16 @@ export async function POST(request) {
       { status: 200 }
     );
   } catch (err) {
+    if (err?.code === "ACTIVE_SUBSCRIPTION_OVERRIDE_REQUIRED") {
+      return NextResponse.json(
+        {
+          error: "Active subscription exists. Override confirmation required.",
+          needsOverride: true,
+          ...(err?.context || {}),
+        },
+        { status: 409 }
+      );
+    }
     const message = String(err?.message || "");
     if (message === "Payment request not found") {
       return NextResponse.json({ error: message }, { status: 404 });

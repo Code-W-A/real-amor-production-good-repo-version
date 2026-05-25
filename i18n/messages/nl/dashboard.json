@@ -55,6 +55,7 @@
   "loadingText": "Laden...",
   "subscriptionDetailsText": "Abonnementsdetails",
   "subscriptionIdText": "Abonnements-ID",
+  "subscriptionAmountText": "Abonnementsbedrag",
   "planText": "Plan",
   "expiryDateText": "Vervaldatum",
   "cancelSubscriptionText": "Abonnement annuleren",

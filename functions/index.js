@@ -281,7 +281,13 @@ exports.sendActivationEmail = functions.firestore
         `Bonjour ${username}\n\n` +
         `Nous sommes ravis de voir que votre profil a été validé par un de nos conseillers et toute l’équipe de RealAmor a bien étudié votre profil.\n` +
         `Votre compte sur RealAmor a été activé!\n` +
-        `Vous pouvez dès à présent choisir un de nos abonnements, vous pouvez trouver les tarifs et le descriptif de chaque abonnement sur la page : https://real-amor.com/#tarifs\n\n` +
+        `Vous pouvez dès à présent choisir un de nos abonnements.\n\n` +
+        `Tarifs:\n` +
+        `- Abonnement 3 mois: 417€\n` +
+        `- Abonnement 6 mois: 654€\n` +
+        `- Abonnement 12 mois: 1068€\n` +
+        `- Abonnement à vie: 1068€\n\n` +
+        `Vous pouvez trouver les tarifs et le descriptif de chaque abonnement sur la page : https://real-amor.com/#tarifs\n\n` +
         `L’équipe RealAmor vous transmettra les profils compatibles sur votre profil.\n` +
         `Si vous avez choisi l’abonnement de 6 mois ou 1 an (le plus conseillé), l’équipe de RealAmor vous fera une présentation par visioconférence/téléphone de chaque profil compatible.\n` +
         `Si vous avez choisi l’abonnement de 1 an (le plus conseillé), RealAmor vous contactera pour vous proposer des conseils de l’équipe scientifique pour améliorer vos chances de réussite.\n\n` +
@@ -291,7 +297,13 @@ exports.sendActivationEmail = functions.firestore
         `Hallo ${username}\n\n` +
         `We zijn verheugd om te zien dat uw profiel is gevalideerd door een van onze adviseurs en dat het gehele RealAmor-team uw profiel grondig heeft beoordeeld.\n` +
         `Uw account op Real Amor is geactiveerd!\n` +
-        `Je kunt nu kiezen voor één van onze abonnementen, de prijzen en de omschrijving van ieder abonnement vind je op de pagina: https://real-amor.com/#tarifs\n\n` +
+        `Je kunt nu kiezen voor één van onze abonnementen.\n\n` +
+        `Tarieven:\n` +
+        `- Abonnement 3 maanden: 417€\n` +
+        `- Abonnement 6 maanden: 654€\n` +
+        `- Abonnement 12 maanden: 1068€\n` +
+        `- Levenslang abonnement: 1068€\n\n` +
+        `De prijzen en omschrijving van ieder abonnement vind je op de pagina: https://real-amor.com/#tarifs\n\n` +
         `Het RealAmor-team stuurt u de compatibele profielen op uw profiel.\n` +
         `Als u gekozen hebt voor het abonnement van 6 maanden of 1 jaar (het meest aanbevolen), zal het RealAmor-team u een presentatie van elk compatibel profiel geven per videoconferentie/telefoon.\n` +
         `Als u  gekozen hebt voor het abonnement van 1 jaar (het meest aanbevolen), neemt RealAmor contact met u op om u advies te geven van het wetenschappelijke team om uw kansen op succes te vergroten.\n` +
@@ -301,7 +313,13 @@ exports.sendActivationEmail = functions.firestore
         `Hello ${username}\n\n` +
         `We are delighted to see that your profile has been validated by one of our advisors and the entire RealAmor team has thoroughly reviewed your profile.\n` +
         `Your account on RealAmor has been activated!\n` +
-        `You can now choose one of our subscriptions, you can find the rates and description of each subscription on the page: https://real-amor.com/#tarifs\n\n` +
+        `You can now choose one of our subscriptions.\n\n` +
+        `Prices:\n` +
+        `- 3-month subscription: 417€\n` +
+        `- 6-month subscription: 654€\n` +
+        `- 12-month subscription: 1068€\n` +
+        `- Lifetime subscription: 1068€\n\n` +
+        `You can find the rates and description of each subscription on the page: https://real-amor.com/#tarifs\n\n` +
         `The RealAmor team will send you the compatible profiles on your profile.\n` +
         `If you have chosen the 6-month or 1-year subscription (the most recommended), the RealAmor team will give you a presentation by videoconference/telephone of each compatible profile.\n` +
         `If you have chosen the 1-year subscription (the most recommended), RealAmor will contact you to offer you advice from the scientific team to improve your chances of success.\n\n` +

@@ -125,6 +125,11 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
 
   const isLifetime =
     userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess;
+  const hasActiveSubscriptionAccess =
+    !!userData?.subscriptionActive ||
+    userData?.subscriptionStatus === "active" ||
+    userData?.subscriptionStatus === "canceledUntilEnd" ||
+    isLifetime;
   const hasManualSource =
     userData?.subscriptionActivationSource === "manual_transfer" ||
     String(userData?.priceId || "").startsWith("manual_");
@@ -139,6 +144,14 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const subscriptionIdDisplay = isManualSubscription
     ? userData?.manualPaymentLastConfirmedRef || "-"
     : subscription?.id || "-";
+  const subscriptionAmountValue = isLifetime
+    ? userData?.lifetimeAmount
+    : userData?.subscriptionAmount;
+  const subscriptionAmountDisplay =
+    typeof subscriptionAmountValue === "number" &&
+    Number.isFinite(subscriptionAmountValue)
+      ? `${subscriptionAmountValue} EUR`
+      : "-";
   const expiryDisplay = isLifetime
     ? "-"
     : isManualSubscription
@@ -271,6 +284,7 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
     const alreadyLifetime =
       userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess;
     if (alreadyLifetime) return false;
+    if (hasActiveSubscriptionAccess) return false;
 
     const userOverride =
       typeof userData?.lifetimeOfferEnabled === "boolean"
@@ -440,6 +454,14 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                     <li>
                       <strong>{translatedTexts.planText}:</strong>{" "}
                       {planDisplay}
+                    </li>
+                    <li>
+                      <strong>
+                        {translatedTexts.subscriptionAmountText ||
+                          "Montant de l'abonnement"}
+                        :
+                      </strong>{" "}
+                      {subscriptionAmountDisplay}
                     </li>
                     <li>
                       <strong>{translatedTexts.expiryDateText}:</strong>{" "}
