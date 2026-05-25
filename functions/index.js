@@ -18,6 +18,104 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const transporter = createMailTransporter();
+const INTERNAL_SIGNUP_NOTIFICATION_TO = "office@real-amor.com";
+
+function mapPurposeToFrenchIntent(purpose) {
+  switch (String(purpose || "").trim()) {
+    case "love":
+      return "chercher une relation stable et durable";
+    case "casual":
+      return "chercher des rencontres coquines";
+    case "friendship":
+      return "élargir son cercle d'amis";
+    default:
+      return "objectif non renseigné";
+  }
+}
+
+function getSignupNotificationUserName(userData) {
+  return String(userData?.username || "").trim() || "Non renseigné";
+}
+
+function getSignupNotificationPhone(userData) {
+  return (
+    String(userData?.phoneDisplay || "").trim() ||
+    String(userData?.phone || "").trim() ||
+    "Non renseigné"
+  );
+}
+
+function getSignupNotificationEmail(userData) {
+  return String(userData?.email || "").trim() || "Non renseigné";
+}
+
+function buildAdminSignupNotification(userData) {
+  const username = getSignupNotificationUserName(userData);
+  const phone = getSignupNotificationPhone(userData);
+  const email = getSignupNotificationEmail(userData);
+  const signupIntent = mapPurposeToFrenchIntent(userData?.purpose);
+
+  return {
+    username,
+    email,
+    subject: `RealAmor - Nouveau compte client - ${username}`,
+    text:
+      `Nom / prénom: ${username}\n` +
+      `Téléphone: ${phone}\n` +
+      `Email: ${email}\n\n` +
+      `${username}, ${phone}, ${email}, a créé un compte sur le site de ` +
+      `RealAmor pour ${signupIntent}.`,
+  };
+}
+
+// Funcție pentru a trimite un email intern către admin când un client creează un cont
+exports.sendNewSignupAdminNotification = functions.firestore
+  .document("Users/{userId}")
+  .onCreate(async (snap, context) => {
+    const userId = String(context?.params?.userId || "").trim();
+    const newUser = snap.data() || {};
+    const adminUids = await getAdminUidSetForFunctions();
+
+    if (adminUids.has(userId)) {
+      console.log(
+        "Sărim peste notificarea internă pentru cont admin:",
+        userId
+      );
+      return null;
+    }
+
+    const mailPayload = buildAdminSignupNotification(newUser);
+
+    try {
+      await transporter.sendMail({
+        from: getMailFrom(),
+        to: INTERNAL_SIGNUP_NOTIFICATION_TO,
+        subject: mailPayload.subject,
+        text: mailPayload.text,
+      });
+
+      console.log(
+        "Email intern signup trimis cu succes:",
+        JSON.stringify({
+          userId,
+          email: mailPayload.email,
+          to: INTERNAL_SIGNUP_NOTIFICATION_TO,
+        })
+      );
+    } catch (error) {
+      console.error(
+        "Eroare la trimiterea emailului intern de signup:",
+        JSON.stringify({
+          userId,
+          email: mailPayload.email,
+          to: INTERNAL_SIGNUP_NOTIFICATION_TO,
+        }),
+        error
+      );
+    }
+
+    return null;
+  });
 
 // Funcție pentru a trimite un email de bun venit
 exports.sendWelcomeEmail = functions.firestore
@@ -249,6 +347,14 @@ exports.sendSubscriptionEmail = functions.firestore
 
     // Verificăm dacă abonamentul a fost creat sau actualizat
     if (!previousUser.subscriptionActive && newUser.subscriptionActive) {
+      if (newUser?.subscriptionActivationSource === "manual_transfer") {
+        console.log(
+          "Skip legacy sendSubscriptionEmail for manual transfer activation:",
+          context?.params?.userId || null
+        );
+        return null;
+      }
+
       const email = newUser.email;
       const username = newUser.username;
       const subName = newUser.subName;

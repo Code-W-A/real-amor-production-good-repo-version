@@ -7,11 +7,6 @@ import Link from "next/link";
 import { withLocalePath } from "@/utils/routeLocale";
 import AlertBox from "@/components/uiElements/AlertBox";
 import { DotLoader } from "react-spinners";
-import { loadStripe } from "@stripe/stripe-js";
-
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-);
 
 export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const { userData, setUserData, currentUser } = useAuth();
@@ -259,48 +254,40 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
   const initiateLifetimeCheckout = async () => {
     if (!lifetimeAccepted) return;
     try {
-      if (!stripePromise) {
-        throw new Error(translatedTexts.stripeNotInitializedText);
-      }
-      const stripe = await stripePromise;
       setBuyingLifetime(true);
 
       const token = await currentUser?.getIdToken?.();
       if (!token)
         throw new Error(translatedTexts.checkoutNotAuthenticatedText);
 
-      const res = await fetch("/api/create-checkout-lifetime", {
+      const res = await fetch("/api/manual-payment-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          paymentType: "lifetime",
           planKey: "LIFETIME",
-          subName: translatedTexts.abonamentLifetimeText,
+          planLabel: translatedTexts.abonamentLifetimeText,
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        let details = "";
-        try {
-          const errJson = await res.json();
-          details =
-            typeof errJson?.error === "string" ? ` - ${errJson.error}` : "";
-        } catch {
-          // ignore
-        }
         throw new Error(
-          `${translatedTexts.checkoutErrorPrefixText}${res.status} - ${res.statusText}${details}`
+          data?.error ||
+            `${translatedTexts.checkoutErrorPrefixText}${res.status} - ${res.statusText}`
         );
       }
 
-      const data = await res.json();
-      if (data?.id) {
-        await stripe.redirectToCheckout({ sessionId: data.id });
-      } else {
-        throw new Error(translatedTexts.checkoutInitFailedText);
-      }
+      setAlertMessage({
+        type: "success",
+        content:
+          translatedTexts.manualPaymentRequestSuccessText ||
+          `Email trimis cu IBAN + sumă + cod (${data?.referenceCode || "-"})`,
+        showAlert: true,
+      });
     } catch (err) {
       console.error(translatedTexts.checkoutInitFailedText, err);
       setAlertMessage({

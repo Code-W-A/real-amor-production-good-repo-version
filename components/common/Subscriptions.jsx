@@ -4,18 +4,13 @@
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import DotLoader from "react-spinners/DotLoader";
 import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { withLocalePath } from "@/utils/routeLocale";
 import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
-
-// Cheia publică Stripe
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-);
+import AlertBox from "@/components/uiElements/AlertBox";
 
 export default function Subscriptions({
   bookingText,
@@ -42,6 +37,11 @@ export default function Subscriptions({
   const [globalLifetimePromoEnabled, setGlobalLifetimePromoEnabled] =
     useState(false);
   const [showLifetimeFloater, setShowLifetimeFloater] = useState(false);
+  const [alertMessage, setAlertMessage] = useState({
+    type: "",
+    content: "",
+    showAlert: false,
+  });
   const router = useRouter();
   const pathname = usePathname();
   const [isRedirecting, setIsRedirecting] = useState(true);
@@ -129,21 +129,15 @@ export default function Subscriptions({
     setIsAccepted(newIsAccepted);
   };
 
-  // Funcția de inițiere a checkout-ului
-  const initiateCheckout = async (
+  const initiateManualPayment = async (
     planKey,
     index,
     subName,
-    opts = { type: "subscription", cancelAtPeriodEndOnCreate: false }
+    opts = { type: "subscription" }
   ) => {
     if (!isAccepted[index]) return; // Dacă checkbox-ul pentru cardul respectiv nu este bifat, nu permite inițierea checkout-ului
 
     try {
-      if (!stripePromise) {
-        throw new Error(translatedLinks.stripeNotInitializedText);
-      }
-
-      const stripe = await stripePromise;
       setLoading(true); // Setează loading la true înainte de a face cererea
 
       const token = await currentUser?.getIdToken?.();
@@ -151,55 +145,44 @@ export default function Subscriptions({
         throw new Error(translatedLinks.notAuthenticatedText);
       }
 
-      const endpoint =
-        opts?.type === "lifetime"
-          ? "/api/create-checkout-lifetime"
-          : "/api/create-checkout-subscription";
-
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/manual-payment-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          planKey, // Server selects correct priceId based on STRIPE_MODE (test/live)
+          paymentType: opts?.type === "lifetime" ? "lifetime" : "subscription",
+          planKey,
+          planLabel: subName,
           nume: userData.username,
           email: userData.email,
           phone: getPhoneDisplayForUi(userData),
           uid: userData.uid,
-          subName,
-          ...(opts?.type === "subscription" &&
-          opts?.cancelAtPeriodEndOnCreate
-            ? { cancelAtPeriodEndOnCreate: true }
-            : {}),
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        // Try to surface server error details (e.g. Stripe price misconfigured)
-        let details = "";
-        try {
-          const errJson = await response.json();
-          details =
-            typeof errJson?.error === "string" ? ` - ${errJson.error}` : "";
-        } catch {
-          // ignore parse errors
-        }
-        throw new Error(`Eroare: ${response.status} - ${response.statusText}${details}`);
+        throw new Error(
+          data?.error || `Eroare: ${response.status} - ${response.statusText}`
+        );
       }
 
-      const data = await response.json();
-
-      if (data.id) {
-        // Redirectează utilizatorul la sesiunea de checkout Stripe
-        await stripe.redirectToCheckout({ sessionId: data.id });
-      } else {
-        alert(translatedLinks.checkoutInitFailedText);
-      }
+      setAlertMessage({
+        type: "success",
+        content:
+          translatedLinks.manualPaymentRequestSuccessText ||
+          `Email trimis cu IBAN + sumă + cod (${data?.referenceCode || "-"})`,
+        showAlert: true,
+      });
     } catch (error) {
-      console.error(translatedLinks.checkoutInitFailedText, error);
-      alert(`${translatedLinks.errorPrefixText}${error.message}`);
+      console.error("manual payment request failed", error);
+      setAlertMessage({
+        type: "danger",
+        content: `${translatedLinks.errorPrefixText}${error.message}`,
+        showAlert: true,
+      });
     } finally {
       setLoading(false); // Resetează starea loading
     }
@@ -331,7 +314,7 @@ export default function Subscriptions({
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
-                        initiateCheckout(
+                        initiateManualPayment(
                           "TEST",
                           0,
                           "ABONAMENT TEST"
@@ -415,7 +398,7 @@ export default function Subscriptions({
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
-                        initiateCheckout(
+                        initiateManualPayment(
                           "SUB_3M",
                           0,
                           translatedLinks.abonament3
@@ -503,7 +486,7 @@ export default function Subscriptions({
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
-                        initiateCheckout(
+                        initiateManualPayment(
                           "SUB_6M",
                           1,
                           translatedLinks.abonament6
@@ -594,7 +577,7 @@ export default function Subscriptions({
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
-                        initiateCheckout(
+                        initiateManualPayment(
                           "SUB_12M",
                           2,
                           translatedLinks.abonament12
@@ -683,7 +666,7 @@ export default function Subscriptions({
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
                       onClick={() =>
-                        initiateCheckout(
+                        initiateManualPayment(
                           "LIFETIME",
                           3,
                           translatedLinks.abonamentLifetime,
@@ -774,7 +757,7 @@ export default function Subscriptions({
                             <button
                               className="button px-40 py-20 fw-500 -purple-1"
                               onClick={() =>
-                                initiateCheckout(
+                                initiateManualPayment(
                                   "LIFETIME",
                                   4,
                                   translatedLinks.abonamentLifetime,
@@ -826,6 +809,12 @@ export default function Subscriptions({
           </button>
         )}
       </div>
+      <AlertBox
+        type={alertMessage.type}
+        message={alertMessage.content}
+        showAlert={alertMessage.showAlert}
+        onClose={() => setAlertMessage({ ...alertMessage, showAlert: false })}
+      />
     </section>
   );
 }

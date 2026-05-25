@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "audit:translations": "node scripts/translation-audit.js"
+    "audit:translations": "node scripts/translation-audit.js",
+    "test:unit:manual-payments": "node --test tests/manual-payments.test.mjs tests/manual-payment-emails.test.mjs",
+    "test:smoke:manual-payments": "node --test tests/manual-payment-smoke.test.mjs",
+    "test:manual-payments": "npm run test:unit:manual-payments && npm run test:smoke:manual-payments"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",

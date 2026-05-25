@@ -327,6 +327,10 @@ const SignUpForm = ({
         purpose: formData.purpose,
       });
 
+      if (typeof window !== "undefined" && typeof window.fbq === "function") {
+        window.fbq("track", "CompleteRegistration");
+      }
+
       setAlertMessage({
         type: "success",
         content: translatedLinks.utilizatorInregistrat,

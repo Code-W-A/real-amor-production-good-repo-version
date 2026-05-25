@@ -31,6 +31,9 @@ function formatFirestoreDate(value) {
   if (value instanceof Date) {
     return value.toLocaleDateString();
   }
+  if (typeof value === "number") {
+    return new Date(value).toLocaleDateString();
+  }
   return null;
 }
 
@@ -67,6 +70,10 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [adminNotes, setAdminNotes] = useState("");
   const [isLoadingAdminNotes, setIsLoadingAdminNotes] = useState(false);
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false);
+  const [manualPayments, setManualPayments] = useState([]);
+  const [isLoadingManualPayments, setIsLoadingManualPayments] = useState(false);
+  const [reviewingManualPaymentId, setReviewingManualPaymentId] = useState(null);
+  const [manualPaymentReviewNotes, setManualPaymentReviewNotes] = useState({});
   const lastSavedAdminNotesRef = useRef("");
   const deleteSuccessRedirectRef = useRef(null);
   const phoneCountryOptions = useMemo(
@@ -298,6 +305,81 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     }
   };
 
+  const loadManualPayments = async (uidValue) => {
+    if (!uidValue) return;
+    try {
+      setIsLoadingManualPayments(true);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(
+        `/api/admin-manual-payments?uid=${encodeURIComponent(uidValue)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to load manual payments");
+      }
+      const entries = Array.isArray(data?.payments) ? data.payments : [];
+      setManualPayments(entries);
+    } catch (error) {
+      console.error("Error loading manual payments:", error);
+    } finally {
+      setIsLoadingManualPayments(false);
+    }
+  };
+
+  const reviewManualPayment = async (paymentId, decision) => {
+    if (!uid || !paymentId) return;
+    try {
+      setReviewingManualPaymentId(paymentId);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const reviewNote = String(manualPaymentReviewNotes?.[paymentId] || "");
+      const res = await fetch("/api/admin-manual-payment-review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          paymentId,
+          decision,
+          reviewNote,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to review payment");
+      }
+
+      await Promise.all([fetchUserData(uid), loadManualPayments(uid)]);
+      setAlertMessage({
+        type: "success",
+        content:
+          decision === "confirme"
+            ? "Paiement confirmé et accès activé."
+            : "Paiement refusé.",
+        showAlert: true,
+      });
+    } catch (error) {
+      setAlertMessage({
+        type: "danger",
+        content: `${translatedTexts?.errorPrefixText || "Erreur"}: ${
+          error.message
+        }`,
+        showAlert: true,
+      });
+    } finally {
+      setReviewingManualPaymentId(null);
+    }
+  };
+
   const handleDeleteUser = async () => {
     if (!uid) return;
     setShowConfirmDialog(false);
@@ -397,8 +479,11 @@ export default function EditProfile({ activeTab, translatedTexts }) {
     if (uid) {
       fetchUserData(uid);
       loadAdminNotes(uid);
+      if (currentUser?.uid) {
+        loadManualPayments(uid);
+      }
     }
-  }, [uid]);
+  }, [uid, currentUser?.uid]);
 
   // Keep an editable draft in sync with loaded user data (until admin starts editing).
   useEffect(() => {
@@ -1207,6 +1292,100 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                 {translatedTexts.accountNotActivatedText}
               </p>
             )
+          ) : null}
+
+          {userData && !isDeletedAccount ? (
+            <div className="col-12 mt-25">
+              <p
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                  textAlign: "start",
+                }}
+              >
+                Paiements manuels
+              </p>
+              {isLoadingManualPayments ? (
+                <p style={{ fontWeight: "bold" }}>Chargement...</p>
+              ) : manualPayments.length === 0 ? (
+                <p style={{ fontWeight: "bold" }}>
+                  Aucune demande de paiement manuel.
+                </p>
+              ) : (
+                <div style={{ display: "grid", gap: 14 }}>
+                  {manualPayments.map((payment) => {
+                    const isPending = payment?.status === "en_attente";
+                    const isReviewing = reviewingManualPaymentId === payment?.id;
+                    return (
+                      <div
+                        key={payment?.id}
+                        style={{
+                          border: "1px solid #e8e8e8",
+                          borderRadius: 10,
+                          padding: 12,
+                        }}
+                      >
+                        <p style={{ marginBottom: 8, fontWeight: "bold" }}>
+                          {payment?.planLabel || "-"} | {payment?.amountEur || 0} EUR
+                        </p>
+                        <p style={{ marginBottom: 4 }}>
+                          <strong>Référence:</strong> {payment?.referenceCode || "-"}
+                        </p>
+                        <p style={{ marginBottom: 4 }}>
+                          <strong>Statut:</strong> {payment?.status || "-"}
+                        </p>
+                        <p style={{ marginBottom: 8 }}>
+                          <strong>Créé le:</strong> {formatFirestoreDate(payment?.createdAt) || "-"}
+                        </p>
+                        <p style={{ marginBottom: 8 }}>
+                          <strong>Traité le:</strong> {formatFirestoreDate(payment?.reviewedAt) || "-"}
+                          {payment?.reviewedBy ? ` (${payment.reviewedBy})` : ""}
+                        </p>
+
+                        <textarea
+                          rows={2}
+                          value={manualPaymentReviewNotes?.[payment?.id] || ""}
+                          onChange={(e) =>
+                            setManualPaymentReviewNotes((prev) => ({
+                              ...prev,
+                              [payment.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="Note interne (optionnel)"
+                          style={{
+                            width: "100%",
+                            border: "1px solid #ddd",
+                            borderRadius: 6,
+                            padding: 8,
+                            marginBottom: 8,
+                          }}
+                        />
+
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className="button -sm -green-5"
+                            disabled={!isPending || isReviewing}
+                            onClick={() => reviewManualPayment(payment.id, "confirme")}
+                          >
+                            Confirmer
+                          </button>
+                          <button
+                            type="button"
+                            className="button -sm -red-1 text-white"
+                            disabled={!isPending || isReviewing}
+                            onClick={() => reviewManualPayment(payment.id, "refuse")}
+                          >
+                            Refuser
+                          </button>
+                          {isReviewing ? <DotLoader color="#c13365" size={20} /> : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : null}
 
           {userData && !isDeletedAccount ? (

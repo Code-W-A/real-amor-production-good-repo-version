@@ -3,16 +3,11 @@
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { DotLoader } from "react-spinners";
 import { withLocalePath } from "@/utils/routeLocale";
 import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
-
-// Verifică dacă variabila de mediu este definită
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-);
+import AlertBox from "@/components/uiElements/AlertBox";
 
 export default function Pricing({
   bookingText,
@@ -29,6 +24,11 @@ export default function Pricing({
   const [loading, setLoading] = useState(false); // Starea pentru a controla butonul de încărcare
   const [isAccepted, setIsAccepted] = useState(false); // Stare pentru checkbox-ul de termeni și condiții
   const [isRedirecting, setIsRedirecting] = useState(true); // Stare pentru checkbox-ul de termeni și condiții
+  const [alertMessage, setAlertMessage] = useState({
+    type: "",
+    content: "",
+    showAlert: false,
+  });
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, loading: loadingContext, userData } = useAuth();
@@ -37,29 +37,26 @@ export default function Pricing({
     setIsAccepted(event.target.checked); // Actualizează starea când checkbox-ul este bifat
   };
 
-  // Funcția de inițiere a checkout-ului
-  const initiateCheckout = async (price) => {
+  const initiateManualPayment = async () => {
     if (!isAccepted) return; // Dacă checkbox-ul nu este bifat, nu permite inițierea checkout-ului
 
     try {
-      if (!stripePromise) {
-        throw new Error(translatedLinks.stripeNotInitializedText);
-      }
-      const stripe = await stripePromise;
       setLoading(true); // Setează loading la true înainte de a face cererea
       const token = await currentUser?.getIdToken?.();
       if (!token) {
         throw new Error(translatedLinks.notAuthenticatedText);
       }
 
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch("/api/manual-payment-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          costRezervare: price * 100, // Convertim în bani (de exemplu, 10000 pentru 100 RON)
+          paymentType: "reservation",
+          planKey: "RESERVATION",
+          planLabel: translatedLinks.bookingText,
           nume: userData.username,
           email: userData.email,
           phone: getPhoneDisplayForUi(userData),
@@ -67,21 +64,27 @@ export default function Pricing({
         }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(`${response.status} - ${response.statusText}`);
+        throw new Error(
+          data?.error || `${response.status} - ${response.statusText}`
+        );
       }
 
-      const data = await response.json();
-
-      if (data.id) {
-        // Redirectează utilizatorul la sesiunea de checkout Stripe
-        await stripe.redirectToCheckout({ sessionId: data.id });
-      } else {
-        alert(translatedLinks.checkoutInitFailedText);
-      }
+      setAlertMessage({
+        type: "success",
+        content:
+          translatedLinks.manualPaymentRequestSuccessText ||
+          `Email trimis cu IBAN + sumă + cod (${data?.referenceCode || "-"})`,
+        showAlert: true,
+      });
     } catch (error) {
-      console.error(translatedLinks.checkoutInitFailedText, error);
-      alert(`${translatedLinks.errorPrefixText}${error.message}`);
+      console.error("manual payment request failed", error);
+      setAlertMessage({
+        type: "danger",
+        content: `${translatedLinks.errorPrefixText}${error.message}`,
+        showAlert: true,
+      });
     } finally {
       setLoading(false); // Resetează starea loading
     }
@@ -236,9 +239,12 @@ export default function Pricing({
                   {isAccepted && (
                     <button
                       className="button px-40 py-20 fw-500 -purple-1"
-                      onClick={() => initiateCheckout(159)}
+                      onClick={initiateManualPayment}
+                      disabled={loading}
                     >
-                      {getStarted}
+                      {loading
+                        ? translatedLinks.manualPaymentRequestLoadingText || "Processing..."
+                        : getStarted}
                     </button>
                   )}
                 </div>
@@ -247,6 +253,12 @@ export default function Pricing({
           </div>
         </div>
       </div>
+      <AlertBox
+        type={alertMessage.type}
+        message={alertMessage.content}
+        showAlert={alertMessage.showAlert}
+        onClose={() => setAlertMessage({ ...alertMessage, showAlert: false })}
+      />
     </section>
   );
 }
