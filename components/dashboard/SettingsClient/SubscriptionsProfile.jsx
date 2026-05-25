@@ -123,6 +123,41 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
 
   const closeConfirmDialog = () => setShowConfirmDialog(false); // Închide dialogul fără anulare
 
+  const isLifetime =
+    userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess;
+  const hasManualSource =
+    userData?.subscriptionActivationSource === "manual_transfer" ||
+    String(userData?.priceId || "").startsWith("manual_");
+  const isManualSubscription =
+    hasManualSource ||
+    (!userData?.subscriptionId &&
+      (userData?.subscriptionStatus === "active" || isLifetime));
+
+  const planDisplay = isLifetime
+    ? userData?.subName || translatedTexts.abonamentLifetimeText
+    : userData?.subName || subscription?.productName || "-";
+  const subscriptionIdDisplay = isManualSubscription
+    ? userData?.manualPaymentLastConfirmedRef || "-"
+    : subscription?.id || "-";
+  const expiryDisplay = isLifetime
+    ? "-"
+    : isManualSubscription
+      ? formatProfileDate(userData?.subscriptionEndDate) || "-"
+      : formatProfileDate(subscription?.current_period_end * 1000);
+  const subscriptionStatusDisplay = isLifetime
+    ? translatedTexts.lifetimeStatusText
+    : userData?.subscriptionStatus === "active"
+      ? translatedTexts.activeStatusText
+      : userData?.subscriptionStatus === "canceledUntilEnd"
+        ? `${translatedTexts.subscriptionCanceledUntilText} ${
+            userData?.subscriptionEndDate instanceof Date
+              ? formatProfileDate(userData.subscriptionEndDate)
+              : formatProfileDate(userData?.subscriptionEndDate)
+          }`
+        : userData?.subscriptionStatus === "canceledImmediately"
+          ? translatedTexts.subscriptionCanceledImmediatelyText
+          : translatedTexts.subscriptionExpiredText;
+
   useEffect(() => {
     if (userData?.subscriptionStatus === "lifetime" || userData?.lifetimeAccess) {
       setLoading(false);
@@ -391,47 +426,29 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                   </p>
                   <ul>
                     <li>
-                      <strong>{translatedTexts.subscriptionIdText}:</strong>{" "}
-                      {userData?.subscriptionStatus === "lifetime" ||
-                      userData?.lifetimeAccess
-                        ? userData?.lifetimeSessionId || "-"
-                        : subscription?.id}
+                      <strong>
+                        {isManualSubscription
+                          ? translatedTexts.manualReferenceLabelText ||
+                            translatedTexts.subscriptionIdText
+                          : translatedTexts.subscriptionIdText}
+                        :
+                      </strong>{" "}
+                      {isLifetime
+                        ? userData?.lifetimeSessionId || subscriptionIdDisplay
+                        : subscriptionIdDisplay}
                     </li>
                     <li>
                       <strong>{translatedTexts.planText}:</strong>{" "}
-                      {userData?.subscriptionStatus === "lifetime" ||
-                      userData?.lifetimeAccess
-                        ? userData?.subName || translatedTexts.abonamentLifetimeText
-                        : subscription?.productName}
+                      {planDisplay}
                     </li>
                     <li>
                       <strong>{translatedTexts.expiryDateText}:</strong>{" "}
-                      {userData?.subscriptionStatus === "lifetime" ||
-                      userData?.lifetimeAccess
-                        ? "-"
-                        : formatProfileDate(
-                            subscription?.current_period_end * 1000
-                          )}
+                      {expiryDisplay}
                     </li>
 
                     <li>
                       <strong>{translatedTexts.subscriptionStatusText}:</strong>{" "}
-                      {userData?.subscriptionStatus === "lifetime" ||
-                      userData?.lifetimeAccess
-                        ? translatedTexts.lifetimeStatusText
-                        : userData?.subscriptionStatus === "active"
-                        ? translatedTexts.activeStatusText
-                        : userData?.subscriptionStatus === "canceledUntilEnd"
-                        ? `${translatedTexts.subscriptionCanceledUntilText} ${
-                            userData?.subscriptionEndDate instanceof Date
-                              ? formatProfileDate(userData.subscriptionEndDate)
-                              : formatProfileDate(
-                                  userData?.subscriptionEndDate
-                                )
-                          }`
-                        : userData?.subscriptionStatus === "canceledImmediately"
-                        ? translatedTexts.subscriptionCanceledImmediatelyText
-                        : translatedTexts.subscriptionExpiredText}
+                      {subscriptionStatusDisplay}
                     </li>
                   </ul>
 
@@ -447,7 +464,12 @@ export default function SubscriptionsProfile({ activeTab, translatedTexts }) {
                         <DotLoader color="#c13365" size={30} />
                       </div>
                     ) : userData?.subscriptionStatus === "lifetime" ||
-                      userData?.lifetimeAccess ? null : userData.subscriptionStatus === "canceledUntilEnd" ? (
+                      userData?.lifetimeAccess ? null : isManualSubscription ? (
+                      <p className="text-14 fw-500 mt-10">
+                        {translatedTexts.manualSubscriptionManagedByTeamText ||
+                          "Cet abonnement est géré manuellement par l'équipe RealAmor."}
+                      </p>
+                    ) : userData.subscriptionStatus === "canceledUntilEnd" ? (
                       <button
                         type="button"
                         className="button -md -green-1 text-white"

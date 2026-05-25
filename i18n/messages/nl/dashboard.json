@@ -101,6 +101,8 @@
   "uploadedImageAltText": "Geüploade afbeelding",
   "promoLabelText": "Promo",
   "lifetimeStatusText": "Actief (levenslang)",
+  "manualSubscriptionManagedByTeamText": "Dit abonnement wordt handmatig beheerd door het RealAmor-team.",
+  "manualReferenceLabelText": "Handmatige referentie",
   "authRequiredText": "Log in om verder te gaan",
   "lifetimeCheckoutInitErrorText": "Fout bij het initialiseren van de checkout",
   "processingText": "Bezig...",

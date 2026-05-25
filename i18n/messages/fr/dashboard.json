@@ -101,6 +101,8 @@
   "uploadedImageAltText": "Image téléchargée",
   "promoLabelText": "Promo",
   "lifetimeStatusText": "Actif (à vie)",
+  "manualSubscriptionManagedByTeamText": "Cet abonnement est géré manuellement par l'équipe RealAmor.",
+  "manualReferenceLabelText": "Référence manuelle",
   "authRequiredText": "Veuillez vous connecter pour continuer",
   "lifetimeCheckoutInitErrorText": "Erreur lors de l'initialisation du checkout",
   "processingText": "Traitement...",
