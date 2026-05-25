@@ -89,4 +89,3 @@ test("reference code generation increments suffix when collisions exist", async 
 test("status constant remains FR pending", () => {
   assert.equal(MANUAL_PAYMENT_STATUS_PENDING, "en_attente");
 });
-

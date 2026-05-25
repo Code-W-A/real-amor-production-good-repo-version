@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/firebaseAdmin";
 import { requireAuth } from "../_utils/requireAuth";
 import { getAdminUidSet } from "../_utils/adminUids";
@@ -9,13 +9,12 @@ import {
   MANUAL_PAYMENT_STATUS_CONFIRMED,
   MANUAL_PAYMENT_STATUS_PENDING,
   MANUAL_PAYMENT_STATUS_REJECTED,
-  computeSubscriptionEndDateFromMonths,
-  getManualPlanConfig,
 } from "../_utils/manualPayments";
 import {
   buildManualPaymentConfirmedEmail,
   buildManualPaymentRejectedEmail,
 } from "../_utils/manualPaymentEmails";
+import { buildManualPaymentConfirmUserUpdate } from "../_utils/manualPaymentEntitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -26,58 +25,68 @@ function parseDecision(raw) {
   return null;
 }
 
-function buildReservationUpdate(payment) {
+function normalizeStatus(raw) {
+  const status = String(raw || "").trim().toLowerCase();
+  if (status === MANUAL_PAYMENT_STATUS_CONFIRMED) return status;
+  if (status === MANUAL_PAYMENT_STATUS_REJECTED) return status;
+  if (status === MANUAL_PAYMENT_STATUS_PENDING) return status;
+  return MANUAL_PAYMENT_STATUS_PENDING;
+}
+
+function buildReservationRevokeUpdate(payment, userData) {
+  const currentReservation =
+    userData?.reservation && typeof userData.reservation === "object"
+      ? userData.reservation
+      : {};
+
   return {
     reservation: {
-      hasReserved: false,
-      status: "paid",
-      sessionId: payment.referenceCode || null,
-      createdAt: new Date().toISOString(),
-      cost: Number(payment.amountEur || 0),
+      ...currentReservation,
+      status: "unpaid",
       paymentSource: "manual_transfer",
       paymentId: payment.id,
+      updatedAt: new Date().toISOString(),
     },
+    manualPaymentLastConfirmedId: null,
+    manualPaymentLastConfirmedRef: null,
   };
 }
 
-function buildSubscriptionUpdate(payment, now) {
-  const plan = getManualPlanConfig(payment.planKey);
-  const endDate = computeSubscriptionEndDateFromMonths(plan?.durationMonths || 0, now);
+function buildSubscriptionRevokeUpdate(now) {
   return {
-    subscriptionActive: true,
-    subscriptionStatus: "active",
+    subscriptionActive: false,
+    subscriptionStatus: "canceledImmediately",
     subscriptionId: null,
-    priceId: `manual_${payment.planKey || "SUB"}`,
-    subscriptionAmount: Number(payment.amountEur || 0),
-    subscriptionStartDate: Timestamp.fromDate(now),
-    subscriptionEndDate: Timestamp.fromDate(endDate),
+    priceId: null,
+    subscriptionAmount: null,
+    subscriptionStartDate: null,
+    subscriptionEndDate: Timestamp.fromDate(now),
     cancelAtPeriodEnd: false,
-    subName: payment.planLabel || plan?.planLabel || "Abonnement",
-    lifetimeAccess: false,
+    subName: null,
     subscriptionActivationSource: "manual_transfer",
-    manualPaymentLastConfirmedId: payment.id,
-    manualPaymentLastConfirmedRef: payment.referenceCode || null,
+    manualPaymentLastConfirmedId: null,
+    manualPaymentLastConfirmedRef: null,
   };
 }
 
-function buildLifetimeUpdate(payment, now) {
+function buildLifetimeRevokeUpdate(now) {
   return {
-    lifetimeAccess: true,
-    lifetimePurchasedAt: Timestamp.fromDate(now),
-    lifetimeSessionId: payment.referenceCode || payment.id,
-    lifetimeAmount: Number(payment.amountEur || 0),
-    subName: payment.planLabel || "Abonnement à vie",
-    subscriptionActive: true,
-    subscriptionStatus: "lifetime",
+    lifetimeAccess: false,
+    lifetimePurchasedAt: null,
+    lifetimeSessionId: null,
+    lifetimeAmount: null,
+    subscriptionActive: false,
+    subscriptionStatus: "canceledImmediately",
     cancelAtPeriodEnd: false,
     subscriptionId: null,
     subscriptionStartDate: null,
-    subscriptionEndDate: null,
+    subscriptionEndDate: Timestamp.fromDate(now),
     subscriptionAmount: null,
     priceId: null,
+    subName: null,
     subscriptionActivationSource: "manual_transfer",
-    manualPaymentLastConfirmedId: payment.id,
-    manualPaymentLastConfirmedRef: payment.referenceCode || null,
+    manualPaymentLastConfirmedId: null,
+    manualPaymentLastConfirmedRef: null,
   };
 }
 
@@ -104,9 +113,12 @@ export async function POST(request) {
     }
 
     const paymentRef = adminDb.collection(MANUAL_PAYMENTS_COLLECTION).doc(paymentId);
-    let transitionApplied = false;
     let paymentData = null;
     let userDataForEmail = null;
+    let noOp = false;
+    let finalStatus = null;
+    let entitlementRevoked = false;
+    let entitlementRevokeSkipped = false;
 
     await adminDb.runTransaction(async (tx) => {
       const paymentSnap = await tx.get(paymentRef);
@@ -114,15 +126,35 @@ export async function POST(request) {
         throw new Error("Payment request not found");
       }
 
-      const data = paymentSnap.data() || {};
+      const existingPaymentData = paymentSnap.data() || {};
+      const currentStatus = normalizeStatus(existingPaymentData.status);
+      finalStatus = decision;
       paymentData = {
         id: paymentSnap.id,
-        ...data,
+        ...existingPaymentData,
+        status: currentStatus,
       };
 
-      if (data.status !== MANUAL_PAYMENT_STATUS_PENDING) {
-        transitionApplied = false;
+      if (currentStatus === decision) {
+        noOp = true;
         return;
+      }
+
+      const needsUserRead =
+        decision === MANUAL_PAYMENT_STATUS_CONFIRMED ||
+        (currentStatus === MANUAL_PAYMENT_STATUS_CONFIRMED &&
+          decision === MANUAL_PAYMENT_STATUS_REJECTED);
+
+      let userRef = null;
+      let userData = null;
+      if (needsUserRead) {
+        userRef = adminDb.collection("Users").doc(String(existingPaymentData.uid || ""));
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists) {
+          throw new Error("User not found for this payment request");
+        }
+        userData = userSnap.data() || {};
+        userDataForEmail = userData;
       }
 
       const now = new Date();
@@ -134,46 +166,63 @@ export async function POST(request) {
           reviewedAt,
           reviewedBy: auth.uid,
           reviewNote,
+          reviewHistory: FieldValue.arrayUnion({
+            fromStatus: currentStatus,
+            toStatus: decision,
+            at: reviewedAt,
+            by: auth.uid,
+            note: reviewNote || null,
+          }),
         },
         { merge: true }
       );
 
-      if (decision !== MANUAL_PAYMENT_STATUS_CONFIRMED) {
-        transitionApplied = true;
+      const payment = { id: paymentId, ...existingPaymentData };
+
+      if (decision === MANUAL_PAYMENT_STATUS_CONFIRMED) {
+        if (!userRef) {
+          throw new Error("User context is missing for confirmation");
+        }
+        tx.set(userRef, buildManualPaymentConfirmUserUpdate(payment, now), {
+          merge: true,
+        });
         return;
       }
 
-      const userRef = adminDb.collection("Users").doc(String(data.uid || ""));
-      const userSnap = await tx.get(userRef);
-      if (!userSnap.exists) {
-        throw new Error("User not found for this payment request");
-      }
-      userDataForEmail = userSnap.data() || {};
+      if (
+        currentStatus === MANUAL_PAYMENT_STATUS_CONFIRMED &&
+        decision === MANUAL_PAYMENT_STATUS_REJECTED
+      ) {
+        if (!userRef || !userData) {
+          throw new Error("User context is missing for revocation");
+        }
 
-      if (data.paymentType === "reservation") {
-        tx.set(userRef, buildReservationUpdate({ id: paymentId, ...data }), { merge: true });
-      } else if (data.paymentType === "subscription") {
-        tx.set(
-          userRef,
-          buildSubscriptionUpdate({ id: paymentId, ...data }, now),
-          { merge: true }
-        );
-      } else if (data.paymentType === "lifetime") {
-        tx.set(userRef, buildLifetimeUpdate({ id: paymentId, ...data }, now), {
-          merge: true,
-        });
-      } else {
-        throw new Error("Unsupported paymentType");
-      }
+        const lastConfirmedId = String(userData?.manualPaymentLastConfirmedId || "");
+        if (lastConfirmedId && lastConfirmedId !== paymentId) {
+          entitlementRevokeSkipped = true;
+          return;
+        }
 
-      transitionApplied = true;
+        if (payment.paymentType === "reservation") {
+          tx.set(userRef, buildReservationRevokeUpdate(payment, userData), {
+            merge: true,
+          });
+        } else if (payment.paymentType === "subscription") {
+          tx.set(userRef, buildSubscriptionRevokeUpdate(now), { merge: true });
+        } else if (payment.paymentType === "lifetime") {
+          tx.set(userRef, buildLifetimeRevokeUpdate(now), { merge: true });
+        } else {
+          throw new Error("Unsupported paymentType");
+        }
+        entitlementRevoked = true;
+      }
     });
 
     if (!paymentData) {
       return NextResponse.json({ error: "Payment request not found" }, { status: 404 });
     }
 
-    if (!transitionApplied) {
+    if (noOp) {
       return NextResponse.json(
         {
           success: true,
@@ -189,7 +238,7 @@ export async function POST(request) {
       const user =
         userDataForEmail || { username: paymentData.username, email: paymentData.email };
 
-      if (decision === MANUAL_PAYMENT_STATUS_CONFIRMED) {
+      if (finalStatus === MANUAL_PAYMENT_STATUS_CONFIRMED) {
         const emailPayload = buildManualPaymentConfirmedEmail({
           user,
           amountEur: paymentData.amountEur,
@@ -200,7 +249,7 @@ export async function POST(request) {
           subject: emailPayload.subject,
           text: emailPayload.text,
         });
-      } else if (decision === MANUAL_PAYMENT_STATUS_REJECTED) {
+      } else if (finalStatus === MANUAL_PAYMENT_STATUS_REJECTED) {
         const emailPayload = buildManualPaymentRejectedEmail({
           user,
           referenceCode: paymentData.referenceCode,
@@ -213,7 +262,15 @@ export async function POST(request) {
       }
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: true,
+        status: finalStatus,
+        entitlementRevoked,
+        entitlementRevokeSkipped,
+      },
+      { status: 200 }
+    );
   } catch (err) {
     const message = String(err?.message || "");
     if (message === "Payment request not found") {

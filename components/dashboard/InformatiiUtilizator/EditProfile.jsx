@@ -45,6 +45,19 @@ function sanitizePdfFileNameSegment(str) {
     .slice(0, 120);
 }
 
+function manualStatusLabel(status) {
+  if (status === "confirme") return "Confirmé";
+  if (status === "refuse") return "Refusé";
+  return "En attente";
+}
+
+const ADMIN_DIRECT_PLAN_OPTIONS = [
+  { key: "SUB_3M", label: "Abonnement 3 mois", amountEur: 417 },
+  { key: "SUB_6M", label: "Abonnement 6 mois", amountEur: 654 },
+  { key: "SUB_12M", label: "Abonnement 12 mois", amountEur: 1068 },
+  { key: "LIFETIME", label: "Abonnement à vie", amountEur: 1290 },
+];
+
 export default function EditProfile({ activeTab, translatedTexts }) {
   const searchParams = useSearchParams(); // Obține parametrii query din URL
   const uid = searchParams.get("uid"); // Extragem UID-ul din query-ul URL-ului
@@ -74,6 +87,9 @@ export default function EditProfile({ activeTab, translatedTexts }) {
   const [isLoadingManualPayments, setIsLoadingManualPayments] = useState(false);
   const [reviewingManualPaymentId, setReviewingManualPaymentId] = useState(null);
   const [manualPaymentReviewNotes, setManualPaymentReviewNotes] = useState({});
+  const [directPlanKey, setDirectPlanKey] = useState("SUB_3M");
+  const [directPlanReviewNote, setDirectPlanReviewNote] = useState("");
+  const [isActivatingPlan, setIsActivatingPlan] = useState(false);
   const lastSavedAdminNotesRef = useRef("");
   const deleteSuccessRedirectRef = useRef(null);
   const phoneCountryOptions = useMemo(
@@ -359,12 +375,22 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       }
 
       await Promise.all([fetchUserData(uid), loadManualPayments(uid)]);
+      if (data?.idempotent) {
+        setAlertMessage({
+          type: "success",
+          content: "Aucune modification (même décision déjà appliquée).",
+          showAlert: true,
+        });
+        return;
+      }
+
+      const actionLabel = decision === "confirme" ? "confirmé" : "refusé";
+      const revokeSuffix = data?.entitlementRevokeSkipped
+        ? " (accès existant conservé: autre paiement confirmé)."
+        : "";
       setAlertMessage({
         type: "success",
-        content:
-          decision === "confirme"
-            ? "Paiement confirmé et accès activé."
-            : "Paiement refusé.",
+        content: `Paiement ${actionLabel}.${revokeSuffix}`,
         showAlert: true,
       });
     } catch (error) {
@@ -377,6 +403,53 @@ export default function EditProfile({ activeTab, translatedTexts }) {
       });
     } finally {
       setReviewingManualPaymentId(null);
+    }
+  };
+
+  const adminActivatePlan = async () => {
+    if (!uid || !directPlanKey) return;
+    try {
+      setIsActivatingPlan(true);
+      const token = await currentUser?.getIdToken?.();
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/admin-activate-plan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid,
+          planKey: directPlanKey,
+          reviewNote: String(directPlanReviewNote || ""),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to activate plan");
+      }
+
+      await Promise.all([fetchUserData(uid), loadManualPayments(uid)]);
+      setDirectPlanReviewNote("");
+      setAlertMessage({
+        type: "success",
+        content: `Abonnement activé (${directPlanKey}) - Réf: ${
+          data?.referenceCode || "-"
+        }`,
+        showAlert: true,
+      });
+    } catch (error) {
+      setAlertMessage({
+        type: "danger",
+        content: `${translatedTexts?.errorPrefixText || "Erreur"}: ${
+          error.message
+        }`,
+        showAlert: true,
+      });
+      console.error("Error activating plan (admin):", error);
+    } finally {
+      setIsActivatingPlan(false);
     }
   };
 
@@ -1303,6 +1376,64 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                   textAlign: "start",
                 }}
               >
+                Activer un abonnement (admin)
+              </p>
+              <div style={{ display: "grid", gap: 10, maxWidth: 560 }}>
+                <select
+                  value={directPlanKey}
+                  onChange={(e) => setDirectPlanKey(String(e.target.value || ""))}
+                  disabled={isActivatingPlan}
+                  className="form-select"
+                  style={{
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    padding: 10,
+                    background: "white",
+                  }}
+                >
+                  {ADMIN_DIRECT_PLAN_OPTIONS.map((plan) => (
+                    <option key={plan.key} value={plan.key}>
+                      {plan.label} - {plan.amountEur} EUR
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  rows={2}
+                  value={directPlanReviewNote}
+                  onChange={(e) => setDirectPlanReviewNote(e.target.value)}
+                  placeholder="Note interne (optionnel)"
+                  style={{
+                    width: "100%",
+                    border: "1px solid #ddd",
+                    borderRadius: 6,
+                    padding: 8,
+                  }}
+                  disabled={isActivatingPlan}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    className="button -sm -green-5"
+                    onClick={adminActivatePlan}
+                    disabled={isActivatingPlan}
+                  >
+                    Activer
+                  </button>
+                  {isActivatingPlan ? <DotLoader color="#c13365" size={20} /> : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {userData && !isDeletedAccount ? (
+            <div className="col-12 mt-25">
+              <p
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                  textAlign: "start",
+                }}
+              >
                 Paiements manuels
               </p>
               {isLoadingManualPayments ? (
@@ -1314,8 +1445,12 @@ export default function EditProfile({ activeTab, translatedTexts }) {
               ) : (
                 <div style={{ display: "grid", gap: 14 }}>
                   {manualPayments.map((payment) => {
-                    const isPending = payment?.status === "en_attente";
                     const isReviewing = reviewingManualPaymentId === payment?.id;
+                    const history = Array.isArray(payment?.reviewHistory)
+                      ? payment.reviewHistory
+                      : [];
+                    const lastAction =
+                      history.length > 0 ? history[history.length - 1] : null;
                     return (
                       <div
                         key={payment?.id}
@@ -1332,7 +1467,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                           <strong>Référence:</strong> {payment?.referenceCode || "-"}
                         </p>
                         <p style={{ marginBottom: 4 }}>
-                          <strong>Statut:</strong> {payment?.status || "-"}
+                          <strong>Statut:</strong> {manualStatusLabel(payment?.status)}
                         </p>
                         <p style={{ marginBottom: 8 }}>
                           <strong>Créé le:</strong> {formatFirestoreDate(payment?.createdAt) || "-"}
@@ -1341,6 +1476,17 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                           <strong>Traité le:</strong> {formatFirestoreDate(payment?.reviewedAt) || "-"}
                           {payment?.reviewedBy ? ` (${payment.reviewedBy})` : ""}
                         </p>
+                        {lastAction ? (
+                          <p style={{ marginBottom: 8 }}>
+                            <strong>Dernière action:</strong>{" "}
+                            {manualStatusLabel(lastAction?.fromStatus)}
+                            {" -> "}
+                            {manualStatusLabel(lastAction?.toStatus)}{" "}
+                            {lastAction?.at
+                              ? `(${formatFirestoreDate(lastAction.at)})`
+                              : ""}
+                          </p>
+                        ) : null}
 
                         <textarea
                           rows={2}
@@ -1365,7 +1511,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                           <button
                             type="button"
                             className="button -sm -green-5"
-                            disabled={!isPending || isReviewing}
+                            disabled={isReviewing}
                             onClick={() => reviewManualPayment(payment.id, "confirme")}
                           >
                             Confirmer
@@ -1373,7 +1519,7 @@ export default function EditProfile({ activeTab, translatedTexts }) {
                           <button
                             type="button"
                             className="button -sm -red-1 text-white"
-                            disabled={!isPending || isReviewing}
+                            disabled={isReviewing}
                             onClick={() => reviewManualPayment(payment.id, "refuse")}
                           >
                             Refuser

@@ -39,11 +39,22 @@ export async function GET(request) {
     const payments = snapshot.docs
       .map((docSnap) => {
         const data = docSnap.data() || {};
+        const historyRaw = Array.isArray(data?.reviewHistory)
+          ? data.reviewHistory
+          : [];
+        const reviewHistory = historyRaw.map((entry) => ({
+          fromStatus: String(entry?.fromStatus || ""),
+          toStatus: String(entry?.toStatus || ""),
+          by: entry?.by || null,
+          note: entry?.note || null,
+          at: toMillis(entry?.at),
+        }));
         return {
           id: docSnap.id,
           ...data,
           createdAt: toMillis(data?.createdAt),
           reviewedAt: toMillis(data?.reviewedAt),
+          reviewHistory,
         };
       })
       .sort((a, b) => toMillis(b?.createdAt) - toMillis(a?.createdAt));
