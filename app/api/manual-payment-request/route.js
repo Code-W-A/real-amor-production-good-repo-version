@@ -12,6 +12,7 @@ import {
   generateManualReferenceCode,
   getManualPlanConfig,
   getManualPlanKeyForPaymentType,
+  resolvePlanPricingFromConfig,
 } from "../_utils/manualPayments";
 import { buildManualPaymentRequestEmail } from "../_utils/manualPaymentEmails";
 
@@ -38,6 +39,13 @@ function normalizePlanFromPayload(body) {
   return null;
 }
 
+function resolveRequestedPlanKey(body, plan) {
+  if (plan?.paymentType === "reservation") return "RESERVATION";
+  return String(body?.planKey || "")
+    .trim()
+    .toUpperCase();
+}
+
 export async function POST(request) {
   try {
     const auth = await requireAuth(request);
@@ -45,9 +53,15 @@ export async function POST(request) {
 
     const body = await request.json();
     const plan = normalizePlanFromPayload(body);
+    const requestedPlanKey = resolveRequestedPlanKey(body, plan);
 
     if (!plan) {
       return NextResponse.json({ error: "Invalid plan or paymentType" }, { status: 400 });
+    }
+
+    const pricing = await resolvePlanPricingFromConfig(adminDb, requestedPlanKey);
+    if (!pricing) {
+      return NextResponse.json({ error: "Invalid pricing configuration" }, { status: 400 });
     }
 
     const userRef = adminDb.collection("Users").doc(auth.uid);
@@ -67,7 +81,7 @@ export async function POST(request) {
       .collection(MANUAL_PAYMENTS_COLLECTION)
       .where("uid", "==", auth.uid)
       .where("paymentType", "==", plan.paymentType)
-      .where("planKey", "==", String(body?.planKey || "").trim().toUpperCase() || "RESERVATION")
+      .where("planKey", "==", requestedPlanKey || "RESERVATION")
       .where("status", "==", MANUAL_PAYMENT_STATUS_PENDING)
       .limit(1)
       .get();
@@ -81,7 +95,10 @@ export async function POST(request) {
           id: existing.id,
           idempotent: true,
           referenceCode: existingData.referenceCode || null,
-          amountEur: existingData.amountEur || plan.amountEur,
+          amountEur: existingData.amountEur || pricing.finalAmountEur,
+          baseAmountEur: existingData.baseAmountEur || pricing.baseAmountEur,
+          appliedDiscountPercent:
+            existingData.appliedDiscountPercent ?? pricing.discountPercent,
           iban: MANUAL_BANK_IBAN,
           beneficiary: MANUAL_BANK_BENEFICIARY,
         },
@@ -98,9 +115,11 @@ export async function POST(request) {
       email,
       username,
       paymentType: plan.paymentType,
-      planKey: String(body?.planKey || "").trim().toUpperCase() || null,
+      planKey: requestedPlanKey || null,
       planLabel: plan.planLabel,
-      amountEur: plan.amountEur,
+      amountEur: pricing.finalAmountEur,
+      baseAmountEur: pricing.baseAmountEur,
+      appliedDiscountPercent: pricing.discountPercent,
       currency: MANUAL_BANK_CURRENCY,
       referenceCode,
       status: MANUAL_PAYMENT_STATUS_PENDING,
@@ -115,7 +134,7 @@ export async function POST(request) {
 
     const emailPayload = buildManualPaymentRequestEmail({
       user: { username, email },
-      amountEur: plan.amountEur,
+      amountEur: pricing.finalAmountEur,
       referenceCode,
     });
 
@@ -130,7 +149,9 @@ export async function POST(request) {
         success: true,
         id: paymentRef.id,
         referenceCode,
-        amountEur: plan.amountEur,
+        amountEur: pricing.finalAmountEur,
+        baseAmountEur: pricing.baseAmountEur,
+        appliedDiscountPercent: pricing.discountPercent,
         iban: MANUAL_BANK_IBAN,
         beneficiary: MANUAL_BANK_BENEFICIARY,
       },

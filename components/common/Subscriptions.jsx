@@ -11,6 +11,11 @@ import { doc, getDoc } from "firebase/firestore";
 import { withLocalePath } from "@/utils/routeLocale";
 import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 import AlertBox from "@/components/uiElements/AlertBox";
+import {
+  computePlanPricing,
+  getDefaultPerPlanDiscountPercent,
+  normalizePerPlanDiscountPercent,
+} from "@/app/api/_utils/manualPayments";
 
 export default function Subscriptions({
   bookingText,
@@ -33,7 +38,9 @@ export default function Subscriptions({
   ]);
   const [loading, setLoading] = useState(false); // Stare pentru a controla butonul de încărcare
   const [promoLoading, setPromoLoading] = useState(true);
-  const [discountPercent, setDiscountPercent] = useState(0);
+  const [perPlanDiscountPercent, setPerPlanDiscountPercent] = useState(
+    getDefaultPerPlanDiscountPercent()
+  );
   const [globalLifetimePromoEnabled, setGlobalLifetimePromoEnabled] =
     useState(false);
   const [showLifetimeFloater, setShowLifetimeFloater] = useState(false);
@@ -54,18 +61,16 @@ export default function Subscriptions({
         const snap = await getDoc(doc(db, "Config", "subscriptionPromo"));
         if (snap.exists()) {
           const data = snap.data();
-          setDiscountPercent(
-            Number.isFinite(Number(data?.discountPercent))
-              ? Number(data.discountPercent)
-              : 0
+          setPerPlanDiscountPercent(
+            normalizePerPlanDiscountPercent(data?.perPlanDiscountPercent)
           );
           setGlobalLifetimePromoEnabled(!!data?.lifetimePromoEnabled);
         } else {
-          setDiscountPercent(0);
+          setPerPlanDiscountPercent(getDefaultPerPlanDiscountPercent());
           setGlobalLifetimePromoEnabled(false);
         }
       } catch {
-        setDiscountPercent(0);
+        setPerPlanDiscountPercent(getDefaultPerPlanDiscountPercent());
         setGlobalLifetimePromoEnabled(false);
       } finally {
         setPromoLoading(false);
@@ -129,6 +134,25 @@ export default function Subscriptions({
     setIsAccepted(newIsAccepted);
   };
 
+  const subscription3mPricing = computePlanPricing(
+    "SUB_3M",
+    perPlanDiscountPercent
+  );
+  const subscription6mPricing = computePlanPricing(
+    "SUB_6M",
+    perPlanDiscountPercent
+  );
+  const subscription12mPricing = computePlanPricing(
+    "SUB_12M",
+    perPlanDiscountPercent
+  );
+  const lifetimePricing = computePlanPricing("LIFETIME", perPlanDiscountPercent);
+
+  const formatMonthlyPrice = (pricing, months) => {
+    if (!pricing || !months) return "0.00";
+    return (Number(pricing.finalAmountEur || 0) / Number(months)).toFixed(2);
+  };
+
   const initiateManualPayment = async (
     planKey,
     index,
@@ -171,9 +195,9 @@ export default function Subscriptions({
 
       setAlertMessage({
         type: "success",
-        content:
-          translatedLinks.manualPaymentRequestSuccessText ||
-          `Email trimis cu IBAN + sumă + cod (${data?.referenceCode || "-"})`,
+        content: `Email transmis avec code IBAN pour virement bancaire. (${data?.referenceCode || "-"}) - ${Number(
+          data?.amountEur ?? 0
+        ).toFixed(2)} EUR`,
         showAlert: true,
       });
     } catch (error) {
@@ -336,8 +360,22 @@ export default function Subscriptions({
                   {translatedLinks.abonament3}
                 </div>
                 <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
-                  139 Euro / {translatedLinks.monthText}
+                  {formatMonthlyPrice(subscription3mPricing, 3)} Euro /{" "}
+                  {translatedLinks.monthText}
                 </div>
+                {(subscription3mPricing?.discountPercent || 0) > 0 ? (
+                  <div className="mt-8 text-14 text-light-1">
+                    <span style={{ textDecoration: "line-through" }}>
+                      {(Number(subscription3mPricing?.baseAmountEur || 0) / 3).toFixed(
+                        2
+                      )}{" "}
+                      EUR/{translatedLinks.monthText}
+                    </span>{" "}
+                    <span className="text-purple-1">
+                      -{subscription3mPricing?.discountPercent}%
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* <Image
                   width={90}
@@ -421,8 +459,22 @@ export default function Subscriptions({
                   {translatedLinks.abonament6}
                 </div>
                 <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
-                  109 Euro / {translatedLinks.monthText}
+                  {formatMonthlyPrice(subscription6mPricing, 6)} Euro /{" "}
+                  {translatedLinks.monthText}
                 </div>
+                {(subscription6mPricing?.discountPercent || 0) > 0 ? (
+                  <div className="mt-8 text-14 text-light-1">
+                    <span style={{ textDecoration: "line-through" }}>
+                      {(Number(subscription6mPricing?.baseAmountEur || 0) / 6).toFixed(
+                        2
+                      )}{" "}
+                      EUR/{translatedLinks.monthText}
+                    </span>{" "}
+                    <span className="text-purple-1">
+                      -{subscription6mPricing?.discountPercent}%
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* <Image
                   width={90}
@@ -508,8 +560,22 @@ export default function Subscriptions({
                   {translatedLinks.abonament12}
                 </div>
                 <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
-                  89 Euro / {translatedLinks.monthText}
+                  {formatMonthlyPrice(subscription12mPricing, 12)} Euro /{" "}
+                  {translatedLinks.monthText}
                 </div>
+                {(subscription12mPricing?.discountPercent || 0) > 0 ? (
+                  <div className="mt-8 text-14 text-light-1">
+                    <span style={{ textDecoration: "line-through" }}>
+                      {(Number(subscription12mPricing?.baseAmountEur || 0) / 12).toFixed(
+                        2
+                      )}{" "}
+                      EUR/{translatedLinks.monthText}
+                    </span>{" "}
+                    <span className="text-purple-1">
+                      -{subscription12mPricing?.discountPercent}%
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* <Image
                   width={90}
@@ -601,8 +667,21 @@ export default function Subscriptions({
                   {translatedLinks.abonamentLifetime}
                 </div>
                 <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
+                  {Number(lifetimePricing?.finalAmountEur || 0).toFixed(2)} EUR
+                </div>
+                <div className="mt-8 text-14 text-light-1">
                   {translatedLinks.lifetimeDurationText}
                 </div>
+                {(lifetimePricing?.discountPercent || 0) > 0 ? (
+                  <div className="mt-8 text-14 text-light-1">
+                    <span style={{ textDecoration: "line-through" }}>
+                      {Number(lifetimePricing?.baseAmountEur || 0).toFixed(2)} EUR
+                    </span>{" "}
+                    <span className="text-purple-1">
+                      -{lifetimePricing?.discountPercent}%
+                    </span>
+                  </div>
+                ) : null}
 
                   {/* Client request: no promo badge on this card */}
 
@@ -708,9 +787,9 @@ export default function Subscriptions({
                         <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
                           Lifetime
                         </div>
-                        {discountPercent > 0 && (
+                        {(lifetimePricing?.discountPercent || 0) > 0 && (
                           <div className="mt-10 text-14 text-purple-1">
-                            Promo: -{discountPercent}%
+                            Promo: -{lifetimePricing?.discountPercent}%
                           </div>
                         )}
 

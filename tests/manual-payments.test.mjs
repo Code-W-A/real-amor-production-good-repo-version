@@ -2,9 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MANUAL_PAYMENT_STATUS_PENDING,
+  applyDiscountToAmount,
+  computePlanPricing,
   getManualPlanConfig,
   getManualPlanKeyForPaymentType,
+  getDefaultPerPlanDiscountPercent,
   generateManualReferenceCode,
+  normalizePerPlanDiscountPercent,
   computeSubscriptionEndDateFromMonths,
 } from "../app/api/_utils/manualPayments.js";
 
@@ -88,4 +92,53 @@ test("reference code generation increments suffix when collisions exist", async 
 
 test("status constant remains FR pending", () => {
   assert.equal(MANUAL_PAYMENT_STATUS_PENDING, "en_attente");
+});
+
+test("normalize per-plan discount keeps strict keys and clamps values", () => {
+  const normalized = normalizePerPlanDiscountPercent({
+    SUB_3M: 20,
+    SUB_6M: 150,
+    SUB_12M: -5,
+    LIFETIME: "10",
+    UNKNOWN: 45,
+  });
+
+  assert.deepEqual(Object.keys(normalized).sort(), [
+    "LIFETIME",
+    "RESERVATION",
+    "SUB_12M",
+    "SUB_3M",
+    "SUB_6M",
+  ]);
+  assert.equal(normalized.SUB_3M, 20);
+  assert.equal(normalized.SUB_6M, 100);
+  assert.equal(normalized.SUB_12M, 0);
+  assert.equal(normalized.LIFETIME, 10);
+  assert.equal(normalized.RESERVATION, 0);
+});
+
+test("plan pricing applies per-plan discount and rounds to 2 decimals", () => {
+  const perPlan = {
+    ...getDefaultPerPlanDiscountPercent(),
+    SUB_3M: 10,
+    SUB_6M: 25,
+  };
+  const sub3 = computePlanPricing("SUB_3M", perPlan);
+  const sub6 = computePlanPricing("SUB_6M", perPlan);
+
+  assert.equal(sub3.baseAmountEur, 417);
+  assert.equal(sub3.discountPercent, 10);
+  assert.equal(sub3.finalAmountEur, 375.3);
+
+  assert.equal(sub6.baseAmountEur, 654);
+  assert.equal(sub6.discountPercent, 25);
+  assert.equal(sub6.finalAmountEur, 490.5);
+});
+
+test("applyDiscountToAmount enforces bounds and money-safe rounding", () => {
+  assert.equal(applyDiscountToAmount(159, 0), 159);
+  assert.equal(applyDiscountToAmount(159, 100), 0);
+  assert.equal(applyDiscountToAmount(159, 50), 79.5);
+  assert.equal(applyDiscountToAmount(417, 10), 375.3);
+  assert.equal(applyDiscountToAmount(417, 999), 0);
 });

@@ -8,6 +8,13 @@ import { DotLoader } from "react-spinners";
 import { withLocalePath } from "@/utils/routeLocale";
 import { getPhoneDisplayForUi } from "@/utils/phoneUtils";
 import AlertBox from "@/components/uiElements/AlertBox";
+import { db } from "@/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import {
+  computePlanPricing,
+  getDefaultPerPlanDiscountPercent,
+  normalizePerPlanDiscountPercent,
+} from "@/app/api/_utils/manualPayments";
 
 export default function Pricing({
   bookingText,
@@ -20,10 +27,12 @@ export default function Pricing({
   acceptTermsText,
   translatedLinks,
 }) {
-  const [isYearly, setIsYearly] = useState(false);
   const [loading, setLoading] = useState(false); // Starea pentru a controla butonul de încărcare
   const [isAccepted, setIsAccepted] = useState(false); // Stare pentru checkbox-ul de termeni și condiții
   const [isRedirecting, setIsRedirecting] = useState(true); // Stare pentru checkbox-ul de termeni și condiții
+  const [perPlanDiscountPercent, setPerPlanDiscountPercent] = useState(
+    getDefaultPerPlanDiscountPercent()
+  );
   const [alertMessage, setAlertMessage] = useState({
     type: "",
     content: "",
@@ -36,6 +45,10 @@ export default function Pricing({
   const handleCheckboxChange = (event) => {
     setIsAccepted(event.target.checked); // Actualizează starea când checkbox-ul este bifat
   };
+  const reservationPricing = computePlanPricing(
+    "RESERVATION",
+    perPlanDiscountPercent
+  );
 
   const initiateManualPayment = async () => {
     if (!isAccepted) return; // Dacă checkbox-ul nu este bifat, nu permite inițierea checkout-ului
@@ -73,9 +86,9 @@ export default function Pricing({
 
       setAlertMessage({
         type: "success",
-        content:
-          translatedLinks.manualPaymentRequestSuccessText ||
-          `Email trimis cu IBAN + sumă + cod (${data?.referenceCode || "-"})`,
+        content: `Email transmis avec code IBAN pour virement bancaire. (${data?.referenceCode || "-"}) - ${Number(
+          data?.amountEur ?? reservationPricing?.finalAmountEur ?? 0
+        ).toFixed(2)} EUR`,
         showAlert: true,
       });
     } catch (error) {
@@ -108,6 +121,25 @@ export default function Pricing({
       setIsRedirecting(false); // Ascundem spinnerul după ce verificările s-au finalizat
     }
   }, [loadingContext, pathname, userData, router]);
+
+  useEffect(() => {
+    const loadPromo = async () => {
+      try {
+        const snap = await getDoc(doc(db, "Config", "subscriptionPromo"));
+        if (!snap.exists()) {
+          setPerPlanDiscountPercent(getDefaultPerPlanDiscountPercent());
+          return;
+        }
+        const data = snap.data() || {};
+        setPerPlanDiscountPercent(
+          normalizePerPlanDiscountPercent(data?.perPlanDiscountPercent)
+        );
+      } catch {
+        setPerPlanDiscountPercent(getDefaultPerPlanDiscountPercent());
+      }
+    };
+    loadPromo();
+  }, []);
 
   // Afișează spinnerul pe centrul ecranului dacă este în stare de redirect
   if (isRedirecting) {
@@ -162,8 +194,18 @@ export default function Pricing({
                   {paymentOneTimeText}
                 </div>
                 <div className="priceCard__price text-45 lh-11 fw-700 text-dark-1 mt-15">
-                  {isYearly ? (5 * 12 * 0.7).toFixed(2) : 159} Euro
+                  {Number(reservationPricing?.finalAmountEur || 0).toFixed(2)} Euro
                 </div>
+                {(reservationPricing?.discountPercent || 0) > 0 ? (
+                  <div className="mt-8 text-14 text-light-1">
+                    <span style={{ textDecoration: "line-through" }}>
+                      {Number(reservationPricing?.baseAmountEur || 0).toFixed(2)} EUR
+                    </span>{" "}
+                    <span className="text-purple-1">
+                      -{reservationPricing.discountPercent}%
+                    </span>
+                  </div>
+                ) : null}
 
                 <Image
                   width={90}

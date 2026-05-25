@@ -10,6 +10,7 @@ import {
   MANUAL_PAYMENTS_COLLECTION,
   MANUAL_PAYMENT_STATUS_CONFIRMED,
   MANUAL_PAYMENT_STATUS_PENDING,
+  resolvePlanPricingFromConfig,
   generateManualReferenceCode,
   getManualPlanConfig,
 } from "../_utils/manualPayments";
@@ -69,6 +70,10 @@ export async function POST(request) {
     if (!plan || (plan.paymentType !== "subscription" && plan.paymentType !== "lifetime")) {
       return NextResponse.json({ error: "Invalid planKey for direct activation" }, { status: 400 });
     }
+    const pricing = await resolvePlanPricingFromConfig(adminDb, planKey);
+    if (!pricing) {
+      return NextResponse.json({ error: "Invalid pricing configuration" }, { status: 400 });
+    }
 
     const userRef = adminDb.collection("Users").doc(uid);
     const userSnap = await userRef.get();
@@ -117,7 +122,9 @@ export async function POST(request) {
       paymentType: plan.paymentType,
       planKey,
       planLabel: plan.planLabel,
-      amountEur: plan.amountEur,
+      amountEur: pricing.finalAmountEur,
+      baseAmountEur: pricing.baseAmountEur,
+      appliedDiscountPercent: pricing.discountPercent,
       currency: MANUAL_BANK_CURRENCY,
       referenceCode,
       status: MANUAL_PAYMENT_STATUS_CONFIRMED,
@@ -160,7 +167,7 @@ export async function POST(request) {
     if (email) {
       const emailPayload = buildManualPaymentConfirmedEmail({
         user: { username, email },
-        amountEur: plan.amountEur,
+        amountEur: pricing.finalAmountEur,
         referenceCode,
       });
       await sendMail({

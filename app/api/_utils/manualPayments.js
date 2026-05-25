@@ -6,6 +6,18 @@ export const MANUAL_PAYMENT_STATUS_REJECTED = "refuse";
 export const MANUAL_BANK_BENEFICIARY = "RealAmor SRL";
 export const MANUAL_BANK_IBAN = "BE32 0019 9397 1002";
 export const MANUAL_BANK_CURRENCY = "EUR";
+export const MANUAL_PROMO_CONFIG_COLLECTION = "Config";
+export const MANUAL_PROMO_CONFIG_DOC = "subscriptionPromo";
+export const MANUAL_PROMO_PERCENT_OPTIONS = Object.freeze([
+  0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100,
+]);
+export const MANUAL_PROMO_PLAN_KEYS = Object.freeze([
+  "RESERVATION",
+  "SUB_3M",
+  "SUB_6M",
+  "SUB_12M",
+  "LIFETIME",
+]);
 
 const PLAN_RULES = Object.freeze({
   RESERVATION: {
@@ -43,6 +55,75 @@ const PLAN_RULES = Object.freeze({
 export function getManualPlanConfig(planKey) {
   const cleanKey = String(planKey || "").trim().toUpperCase();
   return PLAN_RULES[cleanKey] || null;
+}
+
+export function getDefaultPerPlanDiscountPercent() {
+  return {
+    RESERVATION: 0,
+    SUB_3M: 0,
+    SUB_6M: 0,
+    SUB_12M: 0,
+    LIFETIME: 0,
+  };
+}
+
+function clampPercent(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+export function normalizePerPlanDiscountPercent(raw) {
+  const defaults = getDefaultPerPlanDiscountPercent();
+  const input = raw && typeof raw === "object" ? raw : {};
+  for (const planKey of MANUAL_PROMO_PLAN_KEYS) {
+    defaults[planKey] = clampPercent(input[planKey]);
+  }
+  return defaults;
+}
+
+export function applyDiscountToAmount(amountEur, discountPercent) {
+  const base = Number(amountEur || 0);
+  const percent = clampPercent(discountPercent);
+  const discounted = base * (1 - percent / 100);
+  return Math.max(0, Math.round((discounted + Number.EPSILON) * 100) / 100);
+}
+
+export function computePlanPricing(planKey, perPlanDiscountPercent) {
+  const plan = getManualPlanConfig(planKey);
+  if (!plan) return null;
+
+  const discounts = normalizePerPlanDiscountPercent(perPlanDiscountPercent);
+  const discountPercent = discounts[planKey] || 0;
+  const baseAmountEur = Number(plan.amountEur || 0);
+  const finalAmountEur = applyDiscountToAmount(baseAmountEur, discountPercent);
+
+  return {
+    planKey,
+    paymentType: plan.paymentType,
+    planLabel: plan.planLabel,
+    baseAmountEur,
+    discountPercent,
+    finalAmountEur,
+  };
+}
+
+export async function getPerPlanDiscountPercentFromConfig(adminDb) {
+  try {
+    const snap = await adminDb
+      .collection(MANUAL_PROMO_CONFIG_COLLECTION)
+      .doc(MANUAL_PROMO_CONFIG_DOC)
+      .get();
+    const data = snap.exists ? snap.data() || {} : {};
+    return normalizePerPlanDiscountPercent(data?.perPlanDiscountPercent);
+  } catch {
+    return getDefaultPerPlanDiscountPercent();
+  }
+}
+
+export async function resolvePlanPricingFromConfig(adminDb, planKey) {
+  const discounts = await getPerPlanDiscountPercentFromConfig(adminDb);
+  return computePlanPricing(planKey, discounts);
 }
 
 export function getManualPlanKeyForPaymentType(paymentType) {

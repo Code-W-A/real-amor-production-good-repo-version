@@ -125,3 +125,29 @@ test("smoke guard: manual UI/API paths use manual payment endpoints, not Stripe 
   assert.doesNotMatch(manualReqApi, /getStripe\s*\(/);
   assert.doesNotMatch(manualReviewApi, /getStripe\s*\(/);
 });
+
+test("smoke guard: manual payment routes use per-plan discount pricing and persist audit fields", () => {
+  const manualReqApi = readFileSync(
+    resolve(process.cwd(), "app/api/manual-payment-request/route.js"),
+    "utf8"
+  );
+  const adminActivateApi = readFileSync(
+    resolve(process.cwd(), "app/api/admin-activate-plan/route.js"),
+    "utf8"
+  );
+  const adminPromotionsUi = readFileSync(
+    resolve(process.cwd(), "components/dashboard/AdminPromotions.jsx"),
+    "utf8"
+  );
+
+  assert.match(manualReqApi, /resolvePlanPricingFromConfig/);
+  assert.match(manualReqApi, /baseAmountEur/);
+  assert.match(manualReqApi, /appliedDiscountPercent/);
+
+  assert.match(adminActivateApi, /resolvePlanPricingFromConfig/);
+  assert.match(adminActivateApi, /baseAmountEur/);
+  assert.match(adminActivateApi, /appliedDiscountPercent/);
+
+  assert.match(adminPromotionsUi, /perPlanDiscountPercent/);
+  assert.match(adminPromotionsUi, /MANUAL_PROMO_PLAN_KEYS/);
+});
