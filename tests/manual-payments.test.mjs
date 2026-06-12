@@ -21,7 +21,7 @@ test("manual plan config returns expected hardcoded values", () => {
   });
   assert.equal(getManualPlanConfig("SUB_6M")?.amountEur, 654);
   assert.equal(getManualPlanConfig("SUB_12M")?.amountEur, 1068);
-  assert.equal(getManualPlanConfig("LIFETIME")?.amountEur, 1290);
+  assert.equal(getManualPlanConfig("LIFETIME")?.amountEur, 1068);
   assert.equal(getManualPlanConfig("RESERVATION")?.amountEur, 159);
   assert.equal(getManualPlanConfig("nope"), null);
 });

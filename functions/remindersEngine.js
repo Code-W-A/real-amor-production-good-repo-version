@@ -41,6 +41,14 @@ const REMINDER_STAGES = {
         body: (firstName) =>
           `Bonjour ${firstName},\n\n` +
           "Vous êtes tout près de vivre une expérience unique, conçue pour vous aider à comprendre vos véritables affinités et à rencontrer l'amour d'une manière authentique.\n\n" +
+          "Le Rendez-vous de validation a un prix de 159,00€. Nous vous invitons à procéder à ce paiement par virement bancaire à\n" +
+          "RealAmor SRL\n" +
+          "Rue Charles Martel 8, 1000 Bruxelles, Belgique\n" +
+          "TVA1015481815\n" +
+          "IBAN : BE32 0019 9397 1002\n" +
+          "BIC : GEBABEBB\n" +
+          "Communication : nom/prénom/adresse/mail\n" +
+          "Une fois le paiement reçu, vous pourrez accéder à notre agenda RealAmor pour la prise du Rendez-vous, en vous connectant à votre compte !\n" +
           "Il ne vous reste plus qu'à planifier votre rendez-vous de validation avec notre Equipe Neuroscientifique. Lors de cet échange, nous prendrons le temps de décrypter votre profil émotionnel et de peaufiner votre compatibilité avec précision.\n\n" +
           "Je réserve mon rendez-vous maintenant : https://app.real-amor.com/pricing\n\n" +
           "Ce moment est une étape précieuse sur votre chemin vers une relation sincère et durable. Nous serons ravis de vous accompagner dans cette belle aventure.\n\n" +
@@ -53,6 +61,14 @@ const REMINDER_STAGES = {
         body: (firstName) =>
           `Hallo ${firstName},\n\n` +
           "Je staat op het punt een unieke ervaring te beleven, om je ware affiniteiten beter te begrijpen en liefde op een authentieke manier te ontmoeten.\n\n" +
+          "De kosten voor de validatieafspraak bedragen € 159,00. U kunt dit bedrag overmaken via bankoverschrijving naar:\n" +
+          "RealAmor SRL\n" +
+          "Rue Charles Martel 8, 1000 Brussel, België\n" +
+          "BTW-nummer: 1015481815\n" +
+          "IBAN: BE32 0019 9397 1002\n" +
+          "BIC: GEBABEBB\n" +
+          "Referentie: naam/achternaam/adres/e-mail\n" +
+          "Zodra de betaling is ontvangen, kunt u via uw account inloggen op de RealAmor-agenda om uw afspraak te boeken.\n" +
           "Je hoeft alleen nog je validatieafspraak te plannen met ons neurowetenschappelijk team. Tijdens dit gesprek nemen we de tijd om je emotionele profiel te verhelderen en je compatibiliteit zorgvuldig af te stemmen.\n\n" +
           "Ik reserveer nu mijn afspraak: https://app.real-amor.com/pricing\n\n" +
           "Dit is een waardevolle stap op weg naar een oprechte en duurzame relatie. We begeleiden je graag in dit mooie avontuur.\n\n" +
@@ -99,6 +115,20 @@ const REMINDER_STAGES = {
           "Votre inscription sur RealAmor montre déjà votre envie de vivre une belle aventure, profonde et authentique. Il ne vous reste plus qu'une étape pour ouvrir la porte à des rencontres qui vous ressemblent : activer votre abonnement.\n\n" +
           "En validant votre abonnement aujourd'hui, vous rejoignez un univers où chaque profil est soigneusement accompagné, avec l'appui de notre Equipe Neuroscientifique et de notre approche émotionnelle unique.\n\n" +
           "J'active mon abonnement maintenant : https://app.real-amor.com/subscriptions\n\n" +
+          "Nota Bene : tous nos abonnements sont payables uniquement en un seul paiement.\n\n" +
+          "Tarifs:\n" +
+          "- Abonnement 3 mois: Total de 417€ (139€/mois pendant 3 mois), renouvellement à 3 mois.\n" +
+          "- Abonnement 6 mois: Total de 654€ (109€/mois pendant 6 mois), renouvellement à 6 mois.\n" +
+          "- Abonnement 12 mois: Total de 1068€ (89€/mois pendant 12 mois), renouvellement à 12 mois.\n" +
+          "- Abonnement à vie: Total de 1068€ (89€/mois pendant 12 mois). PROMO du moment ! Votre abonnement ne sera pas renouvelé et votre compte sera suivi à vie !\n\n" +
+          "Vous pouvez trouver les tarifs et le descriptif de chaque abonnement sur la page : https://real-amor.com/#tarifs\n\n" +
+          "Nous vous invitons à procéder à ce paiement par virement bancaire à\n" +
+          "RealAmor SRL\n" +
+          "Rue Charles Martel 8, 1000 Bruxelles, Belgique\n" +
+          "TVA1015481815\n" +
+          "IBAN : BE32 0019 9397 1002\n" +
+          "BIC : GEBABEBB\n" +
+          "Communication : nom/prénom/adresse/mail\n\n" +
           "Ne laissez pas cette belle chance en suspens. Nous serions ravis de vous aider à écrire la suite de votre histoire… avec sincérité, respect et émotion.\n\n" +
           "Avec toute notre bienveillance,\n\n" +
           "L'équipe RealAmor\n\n" +
@@ -111,6 +141,20 @@ const REMINDER_STAGES = {
           "Je inschrijving bij RealAmor laat al zien dat je een diepe, authentieke ontmoeting wilt. Er is nog één stap om de deur te openen naar mensen die bij je passen: je abonnement activeren.\n\n" +
           "Door vandaag te abonneren, word je deel van een omgeving waar elk profiel zorgvuldig wordt begeleid, met de steun van ons neurowetenschappelijk team en onze unieke emotionele aanpak.\n\n" +
           "Ik activeer nu mijn abonnement: https://app.real-amor.com/subscriptions\n\n" +
+          "Let op: al onze abonnementen dienen in één keer te worden betaald.\n\n" +
+          "Prijzen:\n" +
+          "- Abonnement van 3 maanden: Totaal € 417 (€ 139 per maand gedurende 3 maanden), wordt elke 3 maanden verlengd.\n" +
+          "- Abonnement van 6 maanden: Totaal € 654 (€ 109 per maand gedurende 6 maanden), wordt elke 6 maanden verlengd.\n" +
+          "- Abonnement van 12 maanden: Totaal € 1068 (€ 89 per maand gedurende 12 maanden), wordt elke 12 maanden verlengd.\n" +
+          "- Levenslang abonnement: Totaal € 1068 (€ 89 per maand gedurende 12 maanden). Speciale aanbieding! Uw abonnement wordt niet verlengd en uw account wordt levenslang gevolgd!\n\n" +
+          "De prijzen en een beschrijving van elk abonnement vindt u op de pagina: https://real-amor.com/#tarifs\n\n" +
+          "Wij verzoeken u de betaling te verrichten via bankoverschrijving naar:\n" +
+          "RealAmor SRL\n" +
+          "Rue Charles Martel 8, 1000 Brussel, België\n" +
+          "BTW-nummer: 1015481815\n" +
+          "IBAN: BE32 0019 9397 1002\n" +
+          "BIC: GEBABEBB\n" +
+          "Referentie: naam/achternaam/adres/e-mailadres\n\n" +
           "Laat deze kans niet liggen. We helpen je graag het volgende hoofdstuk van je verhaal te schrijven… met oprechtheid, respect en emotie.\n\n" +
           "Met alle goeds,\n\n" +
           "Het RealAmor-team\n\n" +

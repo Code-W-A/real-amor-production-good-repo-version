@@ -69,7 +69,7 @@ const ADMIN_DIRECT_PLAN_OPTIONS = [
   { key: "SUB_3M", label: "Abonnement 3 mois", amountEur: 417 },
   { key: "SUB_6M", label: "Abonnement 6 mois", amountEur: 654 },
   { key: "SUB_12M", label: "Abonnement 12 mois", amountEur: 1068 },
-  { key: "LIFETIME", label: "Abonnement à vie", amountEur: 1290 },
+  { key: "LIFETIME", label: "Abonnement à vie", amountEur: 1068 },
 ];
 
 export default function EditProfile({ activeTab, translatedTexts }) {

@@ -34,6 +34,7 @@ test("smoke: request -> confirm -> reject payloads are internally consistent", (
     user: { username: "Client Smoke" },
     amountEur: requestRecord.amountEur,
     referenceCode: requestRecord.referenceCode,
+    paymentType: requestRecord.paymentType,
   });
   assert.match(reqEmail.text, new RegExp(requestRecord.referenceCode));
 

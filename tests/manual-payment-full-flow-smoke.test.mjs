@@ -10,6 +10,7 @@ import {
 import {
   buildManualPaymentRequestEmail,
   buildManualPaymentConfirmedEmail,
+  buildValidationPaymentConfirmedEmail,
 } from "../app/api/_utils/manualPaymentEmails.js";
 
 test("smoke: signup/quiz -> reservation 159 manual -> admin confirm -> manual subscription request -> admin activate", () => {
@@ -32,8 +33,9 @@ test("smoke: signup/quiz -> reservation 159 manual -> admin confirm -> manual su
     user,
     amountEur: reservationPlan.amountEur,
     referenceCode: reservationRef,
+    paymentType: "reservation",
   });
-  assert.match(reservationRequestEmail.text, /159\.00/);
+  assert.match(reservationRequestEmail.text, /159,00€/);
   assert.match(reservationRequestEmail.text, /BE32 0019 9397 1002/);
 
   const reservationPayment = {
@@ -53,7 +55,11 @@ test("smoke: signup/quiz -> reservation 159 manual -> admin confirm -> manual su
     "utf8"
   );
   assert.match(reviewRouteSource, /buildManualPaymentConfirmUserUpdate/);
+  assert.match(reviewRouteSource, /buildValidationPaymentConfirmedEmail/);
   assert.match(reviewRouteSource, /decision === MANUAL_PAYMENT_STATUS_CONFIRMED/);
+
+  const validationConfirmedEmail = buildValidationPaymentConfirmedEmail();
+  assert.match(validationConfirmedEmail.subject, /Confirmation et remerciement/);
   assert.equal(reservationPayment.status, MANUAL_PAYMENT_STATUS_PENDING);
 
   // Step 2: user asks for a subscription from /subscriptions (manual request email path)
@@ -63,6 +69,7 @@ test("smoke: signup/quiz -> reservation 159 manual -> admin confirm -> manual su
     user,
     amountEur: subPlan.amountEur,
     referenceCode: subRef,
+    paymentType: "subscription",
   });
   assert.match(subRequestEmail.text, /1068\.00/);
   assert.match(subRequestEmail.text, /reference code/i);
@@ -87,6 +94,7 @@ test("smoke: signup/quiz -> reservation 159 manual -> admin confirm -> manual su
   assert.match(adminActivateSource, /source:\s*"admin_direct_activation"/);
   assert.match(adminActivateSource, /MANUAL_PAYMENT_STATUS_CONFIRMED/);
   assert.match(adminActivateSource, /buildManualPaymentUserUpdateSummary/);
+  assert.match(adminActivateSource, /buildValidationPaymentConfirmedEmail/);
   assert.match(adminActivateSource, /const planKey = normalizePlanKey/);
 
   const confirmedEmail = buildManualPaymentConfirmedEmail({

@@ -13,6 +13,7 @@ import {
 import {
   buildManualPaymentConfirmedEmail,
   buildManualPaymentRejectedEmail,
+  buildValidationPaymentConfirmedEmail,
 } from "../_utils/manualPaymentEmails";
 import { buildManualPaymentConfirmUserUpdate } from "../_utils/manualPaymentEntitlements";
 
@@ -277,11 +278,15 @@ export async function POST(request) {
         userDataForEmail || { username: paymentData.username, email: paymentData.email };
 
       if (finalStatus === MANUAL_PAYMENT_STATUS_CONFIRMED) {
-        const emailPayload = buildManualPaymentConfirmedEmail({
-          user,
-          amountEur: paymentData.amountEur,
-          referenceCode: paymentData.referenceCode,
-        });
+        const isReservation =
+          String(paymentData.paymentType || "").trim().toLowerCase() === "reservation";
+        const emailPayload = isReservation
+          ? buildValidationPaymentConfirmedEmail()
+          : buildManualPaymentConfirmedEmail({
+              user,
+              amountEur: paymentData.amountEur,
+              referenceCode: paymentData.referenceCode,
+            });
         await sendMail({
           to: email,
           subject: emailPayload.subject,

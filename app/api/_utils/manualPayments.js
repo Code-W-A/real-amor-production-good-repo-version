@@ -47,7 +47,7 @@ const PLAN_RULES = Object.freeze({
   LIFETIME: {
     paymentType: "lifetime",
     planLabel: "Abonnement à vie",
-    amountEur: 1290,
+    amountEur: 1068,
     durationMonths: 0,
   },
 });

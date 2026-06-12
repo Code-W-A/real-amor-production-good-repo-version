@@ -18,7 +18,10 @@ import {
   buildManualPaymentConfirmUserUpdate,
   buildManualPaymentUserUpdateSummary,
 } from "../_utils/manualPaymentEntitlements";
-import { buildManualPaymentConfirmedEmail } from "../_utils/manualPaymentEmails";
+import {
+  buildManualPaymentConfirmedEmail,
+  buildValidationPaymentConfirmedEmail,
+} from "../_utils/manualPaymentEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -165,11 +168,14 @@ export async function POST(request) {
     });
 
     if (email) {
-      const emailPayload = buildManualPaymentConfirmedEmail({
-        user: { username, email },
-        amountEur: pricing.finalAmountEur,
-        referenceCode,
-      });
+      const isReservation = plan.paymentType === "reservation";
+      const emailPayload = isReservation
+        ? buildValidationPaymentConfirmedEmail()
+        : buildManualPaymentConfirmedEmail({
+            user: { username, email },
+            amountEur: pricing.finalAmountEur,
+            referenceCode,
+          });
       await sendMail({
         to: email,
         subject: emailPayload.subject,

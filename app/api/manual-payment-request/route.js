@@ -136,6 +136,7 @@ export async function POST(request) {
       user: { username, email },
       amountEur: pricing.finalAmountEur,
       referenceCode,
+      paymentType: plan.paymentType,
     });
 
     await sendMail({
